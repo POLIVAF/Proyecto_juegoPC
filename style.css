@@ -1,0 +1,562 @@
+:root {
+    --bg-color: #1a1a1a;
+    --text-color: #f0f0f0;
+    --primary-color: #e74c3c;
+    --secondary-color: #3498db;
+    --card-bg: #2c3e50;
+    --card-hover: #3b536b;
+    --border-color: #555;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #000;
+    color: var(--text-color);
+    font-family: 'Courier New', Courier, monospace; /* Pseudo pixel-art font fallback */
+    overflow: hidden; /* No scrollbars during game */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+#ui-container {
+    position: absolute;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none; /* Let clicks pass through where there is no UI */
+}
+
+#main-menu, #game-over, #reward-screen {
+    background-color: rgba(26, 26, 26, 0.95);
+    padding: 2rem;
+    border: 4px solid var(--border-color);
+    border-radius: 8px;
+    max-width: 600px;
+    width: 90%;
+    pointer-events: auto; /* Enable clicks inside menu */
+    box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    text-align: center;
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+    color: #aaa;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 0.8rem;
+    background-color: #111;
+    border: 2px solid var(--border-color);
+    color: white;
+    font-family: inherit;
+    font-size: 1rem;
+    border-radius: 4px;
+}
+
+input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.options {
+    display: flex;
+    gap: 1rem;
+}
+
+.option-card {
+    flex: 1;
+    cursor: pointer;
+    position: relative;
+}
+
+.option-card input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.card-content {
+    display: block;
+    padding: 1rem;
+    background-color: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.option-card:hover .card-content {
+    background-color: var(--card-hover);
+}
+
+.option-card input:checked ~ .card-content {
+    border-color: var(--primary-color);
+    background-color: rgba(231, 76, 60, 0.2);
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+}
+
+.card-content strong {
+    display: block;
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.card-content small {
+    display: block;
+    font-size: 0.8rem;
+    color: #ccc;
+}
+
+button {
+    width: 100%;
+    padding: 1rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    font-family: inherit;
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.2s, transform 0.1s;
+    margin-top: 1rem;
+}
+
+button:hover {
+    background-color: #c0392b;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+#game-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    image-rendering: pixelated; /* Keeps pixel art sharp */
+}
+
+.slot-btn {
+    background: #34495e;
+    color: #fff;
+    border: none;
+    padding: 15px;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s;
+    text-align: left;
+}
+
+.slot-btn:hover:not(:disabled) {
+    background: #2980b9;
+}
+
+.slot-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#inventory-modal {
+    position: fixed; /* O absolute, pero fixed es mejor para UI */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999; /* Valor muy alto para estar sobre el canvas */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#inventory-modal.hidden {
+    display: none;
+}
+
+.inventory-content {
+    background: #2c3e50;
+    padding: 20px;
+    border-radius: 10px;
+    border: 3px solid #ecf0f1;
+    min-width: 400px;
+    pointer-events: all; /* IMPORTANTE: Asegura que el contenido reciba clics */
+}
+
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+}
+
+.equip-grid {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.inv-slot {
+    width: 50px;
+    height: 50px;
+    background: #34495e;
+    border: 2px solid #7f8c8d;
+    border-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    cursor: pointer;
+    position: relative;
+    
+    /* --- AJUSTES CRÍTICOS --- */
+    pointer-events: auto !important; /* Asegura que el slot reciba el clic */
+    z-index: 10;                     /* Lo pone por encima del fondo del modal */
+    user-select: none;               /* Evita que se seleccione texto al hacer clics rápidos */
+}
+
+/* Efecto visual para confirmar que el clic es posible */
+.inv-slot:hover {
+    border-color: #f1c40f;
+    background: #2c3e50;
+}
+
+.inv-slot:active {
+    transform: scale(0.95); /* Feedback visual al presionar */
+}
+
+.item-count {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    background: #e74c3c;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+#game-ui {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+#hud {
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+    display: flex;
+    gap: 20px;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+#power-bar {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+    pointer-events: auto;
+}
+
+.power-slot {
+    width: 50px;
+    height: 50px;
+    background-color: #222;
+    border: 2px solid #555;
+    border-radius: 4px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.power-slot.active {
+    border-color: #f1c40f;
+    box-shadow: 0 0 10px #f1c40f;
+    transform: scale(1.1);
+}
+
+.power-slot.replacing {
+    animation: blink 1s infinite;
+    cursor: crosshair;
+}
+
+@keyframes blink {
+    0% { border-color: red; }
+    50% { border-color: yellow; }
+    100% { border-color: red; }
+}
+
+.slot-key {
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    background-color: #fff;
+    color: #000;
+    font-size: 0.8rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: bold;
+}
+
+.reward-options {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.reward-card {
+    flex: 1;
+    background-color: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.reward-card:hover {
+    background-color: var(--card-hover);
+    transform: translateY(-5px);
+}
+
+.reward-card h3 {
+    margin-bottom: 10px;
+    font-size: 1.2rem;
+}
+
+.reward-card p {
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Mobile Controls styling */
+#mobile-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    width: 100%;
+    height: 160px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 30px;
+    pointer-events: none; /* Let empty space pass clicks */
+    z-index: 1000;
+}
+
+#mobile-controls.hidden {
+    display: none !important;
+}
+
+/* D-Pad Layout */
+#touch-dpad {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.dpad-row {
+    display: flex;
+    align-items: center;
+}
+
+.dpad-btn {
+    width: 50px;
+    height: 50px;
+    background: rgba(44, 62, 80, 0.7);
+    border: 2px solid #ecf0f1;
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: bold;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    transition: background 0.1s, transform 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.dpad-btn:active {
+    background: #e74c3c;
+    transform: scale(0.9);
+}
+
+.dpad-center {
+    width: 50px;
+    height: 50px;
+    background: transparent;
+}
+
+/* Touch Action Buttons Layout */
+#touch-actions {
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.power-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.power-btn {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #fff;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    transition: transform 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.power-btn:active {
+    transform: scale(0.85);
+}
+
+#btn-p1 {
+    background-color: rgba(231, 76, 60, 0.85); /* Fuego */
+}
+#btn-p2 {
+    background-color: rgba(52, 152, 219, 0.85); /* Agua/Hielo */
+}
+#btn-p3 {
+    background-color: rgba(211, 84, 0, 0.85); /* Tierra/Roca */
+}
+
+#btn-attack {
+    width: 75px;
+    height: 75px;
+    background: rgba(231, 76, 60, 0.85);
+    border: 3px solid #ecf0f1;
+    color: #fff;
+    font-size: 2rem;
+    font-weight: bold;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    transition: background 0.1s, transform 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#btn-attack:active {
+    background: #c0392b;
+    transform: scale(0.9);
+}
+
+/* Responsive UI adjustments for mobile screen */
+@media (max-width: 768px) {
+    #hud {
+        font-size: 0.9rem;
+        padding: 5px 10px;
+        gap: 8px;
+    }
+    
+    #power-bar {
+        bottom: auto;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 5px;
+    }
+    
+    .power-slot {
+        width: 40px;
+        height: 40px;
+    }
+
+    #inventory-modal {
+        padding: 10px;
+    }
+
+    .inventory-content {
+        min-width: 90%;
+        padding: 10px;
+    }
+
+    .grid-container {
+        gap: 5px;
+    }
+
+    .inv-slot {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+}
