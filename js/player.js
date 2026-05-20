@@ -58,6 +58,8 @@ class Player {
         // Power System
         this.powers = []; // Array of power objects: { id: 'fire', color: 'red', type: 'fire' }
         this.activePowerIndex = 0;
+        this.furyAuraTimer = 0;
+        this.hitEnemies = [];
     }
 
     update(keys, mouse, camera, dungeon, deltaTime) {
@@ -65,6 +67,10 @@ class Player {
         if (this.poisonTimer > 0) {
             this.poisonTimer--;
             this.hp -= (2 / 60); // 2 HP per second at 60fps
+        }
+        
+        if (this.furyAuraTimer > 0) {
+            this.furyAuraTimer--;
         }
         
         if (this.stunTimer > 0) {
@@ -134,7 +140,7 @@ class Player {
         
         // Attack logic via Spacebar
         if (keys[' '] && this.attackTimer <= 0) {
-            this.attack();
+            this.attack(dungeon);
             this.attackTimer = 30; // cooldown
         }
 
@@ -152,7 +158,7 @@ class Player {
                 this.facing = { x: aimX / length, y: aimY / length };
             }
 
-            this.attack();
+            this.attack(dungeon);
             this.attackTimer = 30;
         }
 
@@ -171,7 +177,7 @@ class Player {
         }
     }
 
-    attack() {
+    attack(dungeon) {
         let activePower = this.powers[this.activePowerIndex];
         let requestedPower = activePower ? activePower.id : 'none';
         
@@ -191,6 +197,7 @@ class Player {
         }
 
         this.isAttacking = true;
+        this.hitEnemies = [];
         
         // Find current power level
         let powerLevel = 1;
@@ -224,6 +231,38 @@ class Player {
             if (this.currentAttackPower === 'water') bDamage = 12;
             if (this.currentAttackPower === 'earth') bDamage = 15;
             
+            // Warrior specific powers
+            if (this.currentAttackPower === 'double_strike') {
+                bDamage = 20; // Deals double damage (2 hits combined)
+            } else if (this.currentAttackPower === 'charge') {
+                bDamage = 14;
+                // Dash/Charge forward checking wall collision in steps
+                if (dungeon) {
+                    let dashDistance = 80;
+                    let step = 5;
+                    for (let d = 0; d < dashDistance; d += step) {
+                        let testX = this.x + this.facing.x * step;
+                        let testY = this.y + this.facing.y * step;
+                        if (!dungeon.isWallRect(testX, testY, this.width, this.height)) {
+                            this.x = testX;
+                            this.y = testY;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            } else if (this.currentAttackPower === 'knockback') {
+                bDamage = 15;
+            } else if (this.currentAttackPower === 'fury') {
+                // Fury buff: increases current player damage by 2%
+                this.damage = this.damage * 1.02;
+                this.furyAuraTimer = 60; // 1 second red aura
+                this.attackTimer = 30;
+                this.isAttacking = false;
+                console.log("¡Furia activa! Daño aumentado a: " + Math.round(this.damage));
+                return;
+            }
+
             this.damage = (bDamage + equipBonus) * multiplier;
 
             if (this.currentAttackPower === 'water') {
@@ -329,10 +368,27 @@ class Player {
         // Draw Warrior Attack
         if (this.isAttacking && this.charClass === 'warrior') {
             ctx.fillStyle = this.currentAttackColor || 'white';
-            let radius = this.currentAttackPower === 'earth' ? 25 : 15; // Earth is wider
+            if (this.currentAttackPower === 'double_strike') {
+                ctx.beginPath();
+                ctx.arc(drawX + this.facing.x * 16 - this.facing.y * 6, drawY + this.facing.y * 16 + this.facing.x * 6, 12, 0, Math.PI * 2);
+                ctx.arc(drawX + this.facing.x * 24 + this.facing.y * 6, drawY + this.facing.y * 24 - this.facing.x * 6, 12, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                let radius = this.currentAttackPower === 'earth' ? 25 : 15; // Earth is wider
+                ctx.beginPath();
+                ctx.arc(drawX + this.facing.x * 20, drawY + this.facing.y * 20, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Draw Fury Aura
+        if (this.furyAuraTimer > 0) {
+            ctx.strokeStyle = 'rgba(192, 57, 43, 0.6)';
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.arc(drawX + this.facing.x * 20, drawY + this.facing.y * 20, radius, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.arc(drawX, drawY, this.width, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.lineWidth = 1;
         }
 
         // Draw Mage projectiles

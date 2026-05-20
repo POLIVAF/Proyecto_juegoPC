@@ -18,7 +18,7 @@ class Floor10Boss extends Boss {
 
     update(player, dungeon, deltaTime) {
         // Ejecutamos la lógica base (quemadura, slow, fases)
-        super.update(player, dungeon, deltaTime);
+        if (super.update(player, dungeon, deltaTime)) return;
 
         // --- LÓGICA DE PROYECTILES ---
         if (this.state === 'CHASE') {

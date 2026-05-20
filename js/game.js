@@ -136,22 +136,67 @@ if (continueBtn) {
   });
 }
 
+function resetPlayerOnDeath(player) {
+  if (!player) return;
+
+  // Reset all powers to level 1
+  if (player.powers) {
+    player.powers.forEach((p) => {
+      p.level = 1;
+    });
+  }
+
+  // Reset base stats based on character class
+  if (player.charClass === "warrior") {
+    player.maxHp = 150;
+    player.maxMana = 50;
+    player.baseDamage = 25;
+    player.speed = 3;
+  } else {
+    // Mage
+    player.maxHp = 80;
+    player.maxMana = 150;
+    player.baseDamage = 15;
+    player.speed = 4;
+  }
+
+  player.hp = player.maxHp;
+  player.mana = player.maxMana;
+  player.damage = player.baseDamage;
+  player.armor = 0;
+  player.weaponLevel = 1;
+
+  // Clear inventory, equipment, projectiles and timers
+  player.inventory = [];
+  player.equipment = [];
+  player.projectiles = [];
+  player.immunityTimer = 0;
+  player.poisonTimer = 0;
+  player.stunTimer = 0;
+  player.furyAuraTimer = 0;
+  player.hitEnemies = [];
+}
+
 // Restart Game Handler
 const restartBtn = document.getElementById("restart-btn");
 if (restartBtn) {
   restartBtn.addEventListener("click", () => {
-    floor = 1;
-    
-    player.hp = player.maxHp;
-    player.mana = player.maxMana;
+    // Calculate dynamic checkpoint floor: automatic blocks of 5 floors
+    let checkpointFloor = Math.floor((floor - 1) / 5) * 5 + 1;
+    floor = checkpointFloor;
+
+    // Reset player powers and upgrades to level 1 baseline before loading
+    resetPlayerOnDeath(player);
 
     enemies = [];
     projectiles = [];
     enemyProjectiles = [];
     droppedItems = [];
 
+    // Load the checkpoint floor
     initLevel(player.name, player.charClass, player.gender, false);
 
+    // Save the reset stats and checkpoint floor
     saveGame();
 
     if (gameOverScreen) {
@@ -166,7 +211,8 @@ if (restartBtn) {
     requestAnimationFrame(gameLoop);
     
     updateInventoryUI();
-    console.log("¡El héroe ha reencarnado en el Piso 1!");
+    updatePowerBarUI();
+    console.log(`¡El héroe ha reaparecido en el Checkpoint (Piso ${floor})!`);
   });
 }
 
@@ -365,8 +411,12 @@ function update(deltaTime) {
       let aDist = Math.sqrt(ax * ax + ay * ay);
       let hitRadius = player.currentAttackPower === "earth" ? 25 : 15;
       if (aDist < hitRadius + e.width / 2 && !e.isImmune) {
-        e.hp -= player.damage;
-        if (e.applyStatus) e.applyStatus(player.currentAttackPower);
+        if (!player.hitEnemies) player.hitEnemies = [];
+        if (!player.hitEnemies.includes(e)) {
+          e.hp -= player.damage;
+          if (e.applyStatus) e.applyStatus(player.currentAttackPower, player);
+          player.hitEnemies.push(e);
+        }
       }
     }
 
@@ -572,7 +622,14 @@ function gameOver() {
   updateMobileControlsVisibility();
   if (gameUi) gameUi.classList.add("hidden");
   if (canvas) canvas.classList.add("hidden");
-  if (gameOverScreen) gameOverScreen.classList.remove("hidden");
+  if (gameOverScreen) {
+    gameOverScreen.classList.remove("hidden");
+    const checkpointFloor = Math.floor((floor - 1) / 5) * 5 + 1;
+    const btn = document.getElementById("restart-btn");
+    if (btn) {
+      btn.innerText = `Reencarnar en Checkpoint (Piso ${checkpointFloor})`;
+    }
+  }
 }
 
 // Inventory Logic
@@ -737,14 +794,46 @@ function updatePowerBarUI() {
     slot.appendChild(numIndicator);
 
     hudPowerBar.appendChild(slot);
+
+    // Dynamic styling for mobile buttons
+    const mobileBtn = document.getElementById(`btn-p${i+1}`);
+    if (mobileBtn) {
+      if (player && i < player.powers.length) {
+        let p = player.powers[i];
+        mobileBtn.style.backgroundColor = p.color;
+        mobileBtn.innerText = p.name[0]; // First letter of the power name (e.g. D, E, E, F)
+        mobileBtn.style.opacity = "1";
+        mobileBtn.style.pointerEvents = "auto";
+        if (i === player.activePowerIndex) {
+          mobileBtn.style.border = "3px solid #f1c40f";
+          mobileBtn.style.transform = "scale(1.15)";
+        } else {
+          mobileBtn.style.border = "2px solid #fff";
+          mobileBtn.style.transform = "scale(1)";
+        }
+      } else {
+        mobileBtn.style.opacity = "0.3";
+        mobileBtn.style.pointerEvents = "none";
+        mobileBtn.innerText = "-";
+        mobileBtn.style.border = "2px solid #555";
+        mobileBtn.style.transform = "scale(1)";
+      }
+    }
   }
 }
 
-const availablePowers = [
+const availableMagePowers = [
   { id: "fire", name: "Fuego", desc: "Mucho daño.", color: "#e74c3c" },
   { id: "water", name: "Agua", desc: "Ataque muy rápido.", color: "#3498db" },
   { id: "earth", name: "Tierra", desc: "Área grande.", color: "#d35400" },
   { id: "wind", name: "Viento", desc: "Aura de Inmunidad.", color: "#2ecc71" },
+];
+
+const availableWarriorPowers = [
+  { id: "double_strike", name: "Doble Golpe", desc: "Realiza un doble ataque.", color: "#f39c12" },
+  { id: "charge", name: "Embestida", desc: "Te lanzas y aturdes 1.5s.", color: "#3498db" },
+  { id: "knockback", name: "Empujar", desc: "Empuja enemigos haciendo daño.", color: "#27ae60" },
+  { id: "fury", name: "Furia", desc: "Aumenta daño en 2% permanentemente.", color: "#c0392b" }
 ];
 
 let selectedPowerToReplace = null;
@@ -755,7 +844,14 @@ function showRewardScreen() {
   rewardScreen.classList.remove("hidden");
   rewardOptions.innerHTML = "";
 
-  let choices = [...availablePowers];
+  const rewardDesc = document.getElementById("reward-desc");
+  if (rewardDesc) {
+    rewardDesc.innerText = player && player.charClass === "warrior" 
+      ? "Elige una nueva habilidad de combate:" 
+      : "Elige un nuevo poder elemental:";
+  }
+
+  let choices = player && player.charClass === "warrior" ? [...availableWarriorPowers] : [...availableMagePowers];
 
   choices.forEach((power) => {
     let card = document.createElement("div");
@@ -781,7 +877,16 @@ function selectPower(power) {
     player.activePowerIndex = player.powers.length - 1;
     finishReward();
   } else {
-    document.getElementById("slot-selection").classList.remove("hidden");
+    const slotSelection = document.getElementById("slot-selection");
+    if (slotSelection) {
+      const pText = slotSelection.querySelector("p");
+      if (pText) {
+        pText.innerText = player && player.charClass === "warrior" 
+          ? "Tu barra está llena. Elige qué habilidad quieres reemplazar:" 
+          : "Tu barra está llena. Elige qué poder quieres reemplazar:";
+      }
+      slotSelection.classList.remove("hidden");
+    }
     selectedPowerToReplace = power;
   }
 }
@@ -799,7 +904,12 @@ function replacePower(slotIndex) {
 
 function finishReward() {
   rewardScreen.classList.add("hidden");
-  document.getElementById("reward-desc").innerText = "Elige un nuevo poder elemental:";
+  const rewardDesc = document.getElementById("reward-desc");
+  if (rewardDesc) {
+    rewardDesc.innerText = player && player.charClass === "warrior" 
+      ? "Elige una nueva habilidad de combate:" 
+      : "Elige un nuevo poder elemental:";
+  }
   floor++;
   initLevel(player.name, player.charClass, player.gender, false);
   gameState = "PLAYING";

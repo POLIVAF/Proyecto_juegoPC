@@ -14,7 +14,7 @@ class BossFloor15 extends Boss {
     }
 
     update(player, dungeon, deltaTime) {
-        super.update(player, dungeon, deltaTime);
+        if (super.update(player, dungeon, deltaTime)) return;
         this.attackTick++;
 
         // --- FASE 1: PATRONES RÍTMICOS (> 50% HP) ---

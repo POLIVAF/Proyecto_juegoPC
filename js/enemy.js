@@ -44,13 +44,43 @@ class Enemy {
         // Status effects
         this.burnTimer = 0;
         this.slowTimer = 0;
+        this.stunTimer = 0;
     }
 
-    applyStatus(type) {
+    applyStatus(type, player) {
         if (type === 'fire') {
             this.burnTimer = 180; // 3 seconds
         } else if (type === 'water') {
             this.slowTimer = 120; // 2 seconds
+        } else if (type === 'charge') {
+            this.stunTimer = 90; // 1.5 seconds at 60 FPS
+        } else if (type === 'knockback' && player) {
+            // Calculate knockback direction
+            let dx = this.x - player.x;
+            let dy = this.y - player.y;
+            let dist = Math.sqrt(dx * dx + dy * dy);
+            let pushX = 0;
+            let pushY = 0;
+            if (dist > 0) {
+                pushX = (dx / dist) * 40;
+                pushY = (dy / dist) * 40;
+            } else {
+                pushX = player.facing.x * 40;
+                pushY = player.facing.y * 40;
+            }
+            
+            // Move enemy in steps checking walls
+            let steps = 8;
+            for (let s = 0; s < steps; s++) {
+                let stepX = this.x + pushX / steps;
+                let stepY = this.y + pushY / steps;
+                if (typeof dungeon !== 'undefined' && !dungeon.isWallRect(stepX, stepY, this.width, this.height)) {
+                    this.x = stepX;
+                    this.y = stepY;
+                } else {
+                    break;
+                }
+            }
         }
     }
 
@@ -69,6 +99,12 @@ class Enemy {
 
         if (this.attackCooldown > 0) {
             this.attackCooldown--;
+        }
+
+        if (this.stunTimer > 0) {
+            this.stunTimer--;
+            this.attackCooldown = Math.max(this.attackCooldown, 2); // Prevent attack
+            return;
         }
 
         // Simple AI: chase player if close, otherwise wander
@@ -159,6 +195,13 @@ class Enemy {
         if (this.slowTimer > 0) ctx.fillStyle = '#2980b9';
 
         ctx.fillRect(drawX - this.width/2 + offsetX, drawY - this.height/2, this.width, this.height);
+
+        // Dizzy stars if stunned
+        if (this.stunTimer > 0) {
+            ctx.fillStyle = '#f1c40f';
+            ctx.font = '10px monospace';
+            ctx.fillText('💫', drawX - 5, drawY - 18);
+        }
 
         // HP bar
         if (this.hp < this.maxHp) {

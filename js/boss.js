@@ -17,6 +17,7 @@ class Boss {
         // Status Effects
         this.burnTimer = 0;
         this.slowTimer = 0;
+        this.stunTimer = 0;
         
         // Boss Mechanics
         this.isImmune = false;
@@ -30,12 +31,39 @@ class Boss {
         this.attackArea = null; // {x, y, radius, timer, maxTimer, damage}
     }
 
-    applyStatus(type) {
+    applyStatus(type, player) {
         if (this.isImmune) return; // Cannot apply status while immune
         if (type === 'fire') {
             this.burnTimer = 300; // 5 seconds of burn (assuming 60fps)
         } else if (type === 'water') {
             this.slowTimer = 180; // 3 seconds of slow
+        } else if (type === 'charge') {
+            this.stunTimer = 90; // 1.5 seconds
+        } else if (type === 'knockback' && player) {
+            // Push boss only slightly (12 pixels)
+            let dx = this.x - player.x;
+            let dy = this.y - player.y;
+            let dist = Math.sqrt(dx * dx + dy * dy);
+            let pushX = 0;
+            let pushY = 0;
+            if (dist > 0) {
+                pushX = (dx / dist) * 12;
+                pushY = (dy / dist) * 12;
+            } else {
+                pushX = player.facing.x * 12;
+                pushY = player.facing.y * 12;
+            }
+            let steps = 4;
+            for (let s = 0; s < steps; s++) {
+                let stepX = this.x + pushX / steps;
+                let stepY = this.y + pushY / steps;
+                if (typeof dungeon !== 'undefined' && !dungeon.isWallRect(stepX, stepY, this.width, this.height)) {
+                    this.x = stepX;
+                    this.y = stepY;
+                } else {
+                    break;
+                }
+            }
         }
     }
 
@@ -50,6 +78,11 @@ class Boss {
         if (this.slowTimer > 0) {
             currentSpeed *= 0.5; // Slowed by 50%
             this.slowTimer--;
+        }
+
+        if (this.stunTimer > 0) {
+            this.stunTimer--;
+            return true; // Indicates stunned (returns true so child classes like Floor10/15 know)
         }
 
         // Phase check
@@ -192,6 +225,13 @@ class Boss {
         if (this.burnTimer > 0) offsetX = (Math.random() - 0.5) * 4;
 
         ctx.fillRect(drawX - this.width/2 + offsetX, drawY - this.height/2, this.width, this.height);
+
+        // Dizzy stars if stunned
+        if (this.stunTimer > 0) {
+            ctx.fillStyle = '#f1c40f';
+            ctx.font = '14px monospace';
+            ctx.fillText('💫', drawX - 6, drawY - this.height/2 - 12);
+        }
 
         if (this.isImmune) {
             ctx.strokeStyle = '#f1c40f';
