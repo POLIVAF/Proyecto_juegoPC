@@ -8,6 +8,21 @@
     --border-color: #555;
 }
 
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -18,11 +33,9 @@ body {
     background-color: #000;
     color: var(--text-color);
     font-family: 'Courier New', Courier, monospace; /* Pseudo pixel-art font fallback */
-    overflow: hidden; /* No scrollbars during game */
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
 }
 
 #ui-container {
@@ -399,50 +412,44 @@ button:active {
     display: none !important;
 }
 
-/* D-Pad Layout */
-#touch-dpad {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+/* Joystick Styling */
+#joystick-zone {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
     pointer-events: auto;
     user-select: none;
     -webkit-user-select: none;
+    z-index: 1001;
 }
 
-.dpad-row {
-    display: flex;
-    align-items: center;
+#joystick-base {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    display: none; /* Centered dynamically by JS */
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
 }
 
-.dpad-btn {
+#joystick-knob {
+    position: absolute;
     width: 50px;
     height: 50px;
-    background: rgba(44, 62, 80, 0.7);
-    border: 2px solid #ecf0f1;
-    color: #fff;
-    font-size: 1.5rem;
-    font-weight: bold;
-    border-radius: 8px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    margin: 0;
-    padding: 0;
-    transition: background 0.1s, transform 0.1s;
-    user-select: none;
-    -webkit-user-select: none;
-}
-
-.dpad-btn:active {
-    background: #e74c3c;
-    transform: scale(0.9);
-}
-
-.dpad-center {
-    width: 50px;
-    height: 50px;
-    background: transparent;
+    background: rgba(255, 255, 255, 0.7);
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 /* Touch Action Buttons Layout */

@@ -939,32 +939,92 @@ function updateMobileControlsVisibility() {
   }
 }
 
-// Set up virtual buttons
+// Set up virtual controls
 if (isTouchDevice) {
-  const directions = {
-    'btn-up': 'w',
-    'btn-down': 's',
-    'btn-left': 'a',
-    'btn-right': 'd'
+  // Joystick Setup
+  window.touchJoystick = {
+    active: false,
+    identifier: null,
+    startX: 0,
+    startY: 0,
+    dx: 0,
+    dy: 0
   };
 
-  for (let id in directions) {
-    const btn = document.getElementById(id);
-    const key = directions[id];
-    if (btn) {
-      btn.addEventListener("touchstart", (e) => {
-        e.preventDefault();
-        keys[key] = true;
-      });
-      btn.addEventListener("touchend", (e) => {
-        e.preventDefault();
-        keys[key] = false;
-      });
-      btn.addEventListener("touchcancel", (e) => {
-        e.preventDefault();
-        keys[key] = false;
-      });
-    }
+  const joystickZone = document.getElementById("joystick-zone");
+  const joystickBase = document.getElementById("joystick-base");
+  const joystickKnob = document.getElementById("joystick-knob");
+
+  if (joystickZone && joystickBase && joystickKnob) {
+    joystickZone.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      if (window.touchJoystick.active) return;
+
+      const t = e.changedTouches[0];
+      window.touchJoystick.active = true;
+      window.touchJoystick.identifier = t.identifier;
+      window.touchJoystick.startX = t.clientX;
+      window.touchJoystick.startY = t.clientY;
+      window.touchJoystick.dx = 0;
+      window.touchJoystick.dy = 0;
+
+      // Show joystick base at touch coordinates
+      joystickBase.style.left = t.clientX + "px";
+      joystickBase.style.top = t.clientY + "px";
+      joystickBase.style.display = "block";
+
+      joystickKnob.style.left = "50%";
+      joystickKnob.style.top = "50%";
+    });
+
+    window.addEventListener("touchmove", (e) => {
+      if (!window.touchJoystick.active) return;
+
+      for (let i = 0; i < e.touches.length; i++) {
+        const t = e.touches[i];
+        if (t.identifier === window.touchJoystick.identifier) {
+          let offsetX = t.clientX - window.touchJoystick.startX;
+          let offsetY = t.clientY - window.touchJoystick.startY;
+
+          const maxRadius = 50; // max distance visually
+          const dist = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
+
+          if (dist > maxRadius) {
+            offsetX = (offsetX / dist) * maxRadius;
+            offsetY = (offsetY / dist) * maxRadius;
+          }
+
+          // Move the visual knob
+          joystickKnob.style.left = `calc(50% + ${offsetX}px)`;
+          joystickKnob.style.top = `calc(50% + ${offsetY}px)`;
+
+          // Normalize values to -1..1
+          window.touchJoystick.dx = offsetX / maxRadius;
+          window.touchJoystick.dy = offsetY / maxRadius;
+          break;
+        }
+      }
+    });
+
+    const endJoystick = (e) => {
+      if (!window.touchJoystick.active) return;
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === window.touchJoystick.identifier) {
+          window.touchJoystick.active = false;
+          window.touchJoystick.identifier = null;
+          window.touchJoystick.dx = 0;
+          window.touchJoystick.dy = 0;
+
+          joystickBase.style.display = "none";
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("touchend", endJoystick);
+    window.addEventListener("touchcancel", endJoystick);
   }
 
   // Attack Button
@@ -973,6 +1033,7 @@ if (isTouchDevice) {
     btnAttack.addEventListener("touchstart", (e) => {
       e.preventDefault();
       mouse.clicked = true;
+      mouse.isVirtualButton = true;
     });
   }
 

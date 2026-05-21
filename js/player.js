@@ -82,30 +82,56 @@ class Player {
         // --- Lógica de Movimiento y Ataque original ---
         let dx = 0;
         let dy = 0;
+        let currentSpeed = this.speed;
+
+        if (this.powers.length > 0) {
+            this.activePowerIndex = Math.min(this.activePowerIndex, this.powers.length - 1);
+        }
 
         // Switch active power
         if (keys['1']) this.activePowerIndex = 0;
         if (keys['2']) this.activePowerIndex = 1;
         if (keys['3']) this.activePowerIndex = 2;
-        if (this.powers.length > 0) {
-            this.activePowerIndex = Math.min(this.activePowerIndex, this.powers.length - 1);
-        }
 
-        if (keys['w'] || keys['ArrowUp']) dy -= 1;
-        if (keys['s'] || keys['ArrowDown']) dy += 1;
-        if (keys['a'] || keys['ArrowLeft']) dx -= 1;
-        if (keys['d'] || keys['ArrowRight']) dx += 1;
+        // Joystick controls if active
+        if (window.touchJoystick && window.touchJoystick.active) {
+            dx = window.touchJoystick.dx;
+            dy = window.touchJoystick.dy;
+            let magnitude = Math.sqrt(dx * dx + dy * dy);
+            if (magnitude > 1) {
+                dx /= magnitude;
+                dy /= magnitude;
+                magnitude = 1;
+            }
+            // Analog speed: magnitude < 0.5 is walking, >= 0.5 is running
+            if (magnitude < 0.5) {
+                currentSpeed = this.speed * 0.5; // walk
+            } else {
+                currentSpeed = this.speed; // run
+            }
+        } else {
+            if (keys['w'] || keys['ArrowUp']) dy -= 1;
+            if (keys['s'] || keys['ArrowDown']) dy += 1;
+            if (keys['a'] || keys['ArrowLeft']) dx -= 1;
+            if (keys['d'] || keys['ArrowRight']) dx += 1;
 
-        // Normalize diagonal movement
-        if (dx !== 0 && dy !== 0) {
-            let length = Math.sqrt(dx * dx + dy * dy);
-            dx /= length;
-            dy /= length;
+            // Normalize diagonal movement
+            if (dx !== 0 && dy !== 0) {
+                let length = Math.sqrt(dx * dx + dy * dy);
+                dx /= length;
+                dy /= length;
+            }
         }
 
         // Keep track of facing for attacks
         if (dx !== 0 || dy !== 0) {
             this.facing = { x: dx, y: dy };
+            // Normalize facing direction
+            let fLen = Math.sqrt(this.facing.x * this.facing.x + this.facing.y * this.facing.y);
+            if (fLen > 0) {
+                this.facing.x /= fLen;
+                this.facing.y /= fLen;
+            }
             this.idleTimer = 0; // Reset idle
         } else {
             this.idleTimer++;
@@ -122,8 +148,8 @@ class Player {
             this.immunityTimer--;
         }
 
-        let newX = this.x + dx * this.speed;
-        let newY = this.y + dy * this.speed;
+        let newX = this.x + dx * currentSpeed;
+        let newY = this.y + dy * currentSpeed;
 
         // Collision with walls using Axis-Aligned Bounding Box
         if (!dungeon.isWallRect(newX, newY, this.width, this.height)) {
@@ -146,16 +172,21 @@ class Player {
 
         // Attack logic via Mouse Click
         if (mouse.clicked && this.attackTimer <= 0) {
-            // Calculate direction from player to mouse
-            let playerScreenX = this.x - camera.x;
-            let playerScreenY = this.y - camera.y;
-            let aimX = mouse.x - playerScreenX;
-            let aimY = mouse.y - playerScreenY;
-            
-            // Normalize
-            let length = Math.sqrt(aimX * aimX + aimY * aimY);
-            if (length > 0) {
-                this.facing = { x: aimX / length, y: aimY / length };
+            if (mouse.isVirtualButton) {
+                // Virtual attack button preserves current facing direction
+                mouse.isVirtualButton = false;
+            } else {
+                // Calculate direction from player to mouse
+                let playerScreenX = this.x - camera.x;
+                let playerScreenY = this.y - camera.y;
+                let aimX = mouse.x - playerScreenX;
+                let aimY = mouse.y - playerScreenY;
+                
+                // Normalize
+                let length = Math.sqrt(aimX * aimX + aimY * aimY);
+                if (length > 0) {
+                    this.facing = { x: aimX / length, y: aimY / length };
+                }
             }
 
             this.attack(dungeon);

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Isekai Tower</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -126,14 +126,11 @@
 
         <!-- Controles Móviles Virtuales -->
         <div id="mobile-controls" class="hidden">
-            <div id="touch-dpad">
-                <button type="button" id="btn-up" class="dpad-btn">▲</button>
-                <div class="dpad-row">
-                    <button type="button" id="btn-left" class="dpad-btn">◀</button>
-                    <div class="dpad-center"></div>
-                    <button type="button" id="btn-right" class="dpad-btn">▶</button>
+            <!-- Virtual Joystick Container (Left Side Zone) -->
+            <div id="joystick-zone">
+                <div id="joystick-base">
+                    <div id="joystick-knob"></div>
                 </div>
-                <button type="button" id="btn-down" class="dpad-btn">▼</button>
             </div>
             
             <div id="touch-actions">
