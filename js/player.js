@@ -170,9 +170,10 @@ class Player {
             this.attackTimer = 30; // cooldown
         }
 
-        // Attack logic via Mouse Click
-        if (mouse.clicked && this.attackTimer <= 0) {
-            if (mouse.isVirtualButton) {
+        // Attack logic via Mouse Click or Hold
+        let wantsAttack = mouse.clicked || (window.touchAttackHeld && this.attackTimer <= 0);
+        if (wantsAttack && this.attackTimer <= 0) {
+            if (mouse.isVirtualButton || window.touchAttackHeld) {
                 // Virtual attack button preserves current facing direction
                 mouse.isVirtualButton = false;
             } else {

@@ -1,3 +1,4 @@
+const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const canvas = document.getElementById("game-canvas");
 const ctx = canvas.getContext("2d");
 const uiContainer = document.getElementById("ui-container");
@@ -22,6 +23,7 @@ let gameState = "MENU"; // MENU, PLAYING, GAMEOVER, REWARD
 let lastTime = 0;
 let keys = {};
 let mouse = { x: 0, y: 0, clicked: false };
+window.touchAttackHeld = false;
 let isChangingLevel = false;
 let isTransitioning = false;
 let currentSaveSlot = 1; // Internal save slot
@@ -36,6 +38,19 @@ let droppedItems = []; // Items on the ground
 let camera = { x: 0, y: 0, width: 0, height: 0 };
 let floor = 1;
 
+function checkOrientation() {
+  const warning = document.getElementById("orientation-warning");
+  if (!warning) return false;
+
+  if (isTouchDevice && window.innerHeight > window.innerWidth) {
+    warning.classList.remove("hidden");
+    return true; // is blocked
+  } else {
+    warning.classList.add("hidden");
+    return false; // not blocked
+  }
+}
+
 // Resize canvas
 function resize() {
   canvas.width = window.innerWidth;
@@ -43,6 +58,7 @@ function resize() {
   camera.width = canvas.width;
   camera.height = canvas.height;
   ctx.imageSmoothingEnabled = false; // Pixel art style
+  checkOrientation();
 }
 window.addEventListener("resize", resize);
 resize();
@@ -606,6 +622,13 @@ function draw() {
 }
 
 function gameLoop(timestamp) {
+  if (checkOrientation()) {
+    // Landscape warning active, pause gameplay updates and draw calls
+    lastTime = timestamp;
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+
   let deltaTime = timestamp - lastTime;
   lastTime = timestamp;
 
@@ -1034,6 +1057,18 @@ if (isTouchDevice) {
       e.preventDefault();
       mouse.clicked = true;
       mouse.isVirtualButton = true;
+      window.touchAttackHeld = true;
+      btnAttack.classList.add("pressed");
+    });
+    btnAttack.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      window.touchAttackHeld = false;
+      btnAttack.classList.remove("pressed");
+    });
+    btnAttack.addEventListener("touchcancel", (e) => {
+      e.preventDefault();
+      window.touchAttackHeld = false;
+      btnAttack.classList.remove("pressed");
     });
   }
 
@@ -1050,10 +1085,17 @@ if (isTouchDevice) {
       btn.addEventListener("touchstart", (e) => {
         e.preventDefault();
         keys[key] = true;
+        btn.classList.add("pressed");
       });
       btn.addEventListener("touchend", (e) => {
         e.preventDefault();
         keys[key] = false;
+        btn.classList.remove("pressed");
+      });
+      btn.addEventListener("touchcancel", (e) => {
+        e.preventDefault();
+        keys[key] = false;
+        btn.classList.remove("pressed");
       });
     }
   }

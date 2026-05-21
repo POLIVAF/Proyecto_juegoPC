@@ -502,12 +502,12 @@ button:active {
 }
 
 #btn-attack {
-    width: 75px;
-    height: 75px;
-    background: rgba(231, 76, 60, 0.85);
-    border: 3px solid #ecf0f1;
-    color: #fff;
-    font-size: 2rem;
+    width: 80px;
+    height: 80px;
+    background: rgba(231, 76, 60, 0.4); /* Transparent red */
+    border: 3px solid rgba(236, 240, 241, 0.6); /* Transparent white */
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 2.2rem;
     font-weight: bold;
     border-radius: 50%;
     display: flex;
@@ -516,15 +516,73 @@ button:active {
     cursor: pointer;
     margin: 0;
     padding: 0;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     transition: background 0.1s, transform 0.1s;
     user-select: none;
     -webkit-user-select: none;
+    touch-action: none;
 }
 
-#btn-attack:active {
-    background: #c0392b;
+#btn-attack:active, #btn-attack.pressed {
+    background: rgba(231, 76, 60, 0.85); /* Solid on press */
+    border-color: rgba(236, 240, 241, 0.9);
     transform: scale(0.9);
+}
+
+.power-btn:active, .power-btn.pressed {
+    transform: scale(0.85);
+    background-color: rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Orientation Warning Overlay */
+#orientation-warning {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #0d0d0d;
+    color: #f0f0f0;
+    z-index: 100000; /* Extremely high z-index to block everything */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+#orientation-warning.hidden {
+    display: none !important;
+}
+
+#orientation-warning .rotate-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    animation: rotateDevice 2s infinite ease-in-out;
+}
+
+#orientation-warning h2 {
+    color: var(--primary-color);
+    font-size: 2rem;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#orientation-warning p {
+    color: #ccc;
+    font-size: 1.1rem;
+    max-width: 80%;
+    line-height: 1.4;
+}
+
+@keyframes rotateDevice {
+    0% { transform: rotate(0deg); }
+    50% { transform: rotate(-90deg); }
+    100% { transform: rotate(0deg); }
 }
 
 /* Responsive UI adjustments for mobile screen */
