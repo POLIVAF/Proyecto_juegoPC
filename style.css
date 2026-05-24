@@ -804,6 +804,33 @@ button:active {
     }
 }
 
+/* Active Menu State styling for scrolling on mobile/small viewports */
+html.menu-active, body.menu-active {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    touch-action: auto !important;
+    height: auto !important;
+    min-height: 100dvh !important;
+}
+
+#ui-container.menu-active {
+    position: relative !important;
+    height: auto !important;
+    min-height: 100dvh !important;
+    pointer-events: auto !important;
+    padding: 20px 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+}
+
+#ui-container.menu-active > #main-menu,
+#ui-container.menu-active > #game-over,
+#ui-container.menu-active > #reward-screen {
+    margin: auto 0 !important;
+}
+
 /* Responsive UI adjustments for mobile screen */
 @media (max-width: 768px) {
     #hud {
@@ -1294,6 +1321,35 @@ button:active {
 .tooltip-rarity.rarity-very_rare { color: #9b59b6; text-shadow: 0 0 5px rgba(155, 89, 182, 0.3); }
 .tooltip-rarity.rarity-epic { color: #e67e22; text-shadow: 0 0 6px rgba(230, 126, 34, 0.3); }
 .tooltip-rarity.rarity-legendary { color: #f1c40f; text-shadow: 0 0 8px rgba(241, 196, 15, 0.4); }
+
+/* Responsive adjustments for narrow portrait screens (mobile) */
+@media (max-width: 480px) {
+    .options {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .option-card {
+        width: 100%;
+    }
+    #main-menu, #game-over, #reward-screen {
+        padding: 1.2rem;
+        width: 95%;
+    }
+    h1 {
+        font-size: 1.8rem;
+    }
+    h2 {
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    button {
+        padding: 0.8rem;
+        font-size: 1.1rem;
+    }
+}
 
 
 

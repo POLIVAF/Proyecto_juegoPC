@@ -483,9 +483,36 @@ function handleDrop(e, targetType, targetValue) {
 
 let isPortrait = false;
 
+function updateScreenState() {
+  const isPlaying = gameState === "PLAYING";
+  if (isPlaying) {
+    document.body.classList.remove("menu-active");
+    document.documentElement.classList.remove("menu-active");
+    const uiContainer = document.getElementById("ui-container");
+    if (uiContainer) uiContainer.classList.remove("menu-active");
+  } else {
+    document.body.classList.add("menu-active");
+    document.documentElement.classList.add("menu-active");
+    const uiContainer = document.getElementById("ui-container");
+    if (uiContainer) uiContainer.classList.add("menu-active");
+  }
+}
+
+function setGameState(state) {
+  gameState = state;
+  updateScreenState();
+  checkOrientation();
+}
+
 function checkOrientation() {
   const warning = document.getElementById("orientation-warning");
   if (!warning) return false;
+
+  if (gameState !== "PLAYING") {
+    isPortrait = false;
+    warning.classList.add("hidden");
+    return false; // not blocked
+  }
 
   isPortrait = window.innerHeight > window.innerWidth;
   if (isPortrait) {
@@ -709,7 +736,7 @@ if (restartBtn) {
     if (gameUi) gameUi.classList.remove("hidden");
     if (canvas) canvas.classList.remove("hidden");
 
-    gameState = "PLAYING";
+    setGameState("PLAYING");
     updateMobileControlsVisibility();
     startGameLoop();
     
@@ -836,7 +863,7 @@ function startGame(name, charClass, gender, startFloor, powers, hp, newPlayer) {
     updateInventoryUI();
   }
 
-  gameState = "PLAYING";
+  setGameState("PLAYING");
   updateMobileControlsVisibility();
   startGameLoop();
 }
@@ -1624,7 +1651,7 @@ function gameOver() {
     console.log("¡Resucitaste usando un Corazón de Reserva! Corazones restantes: " + player.reserveHearts.length);
     return;
   }
-  gameState = "GAMEOVER";
+  setGameState("GAMEOVER");
   updateMobileControlsVisibility();
   if (gameUi) gameUi.classList.add("hidden");
   if (canvas) canvas.classList.add("hidden");
@@ -2139,7 +2166,7 @@ function getPowerIcon(power) {
 let selectedPowerToReplace = null;
 
 function showRewardScreen() {
-  gameState = "REWARD";
+  setGameState("REWARD");
   updateMobileControlsVisibility();
   rewardScreen.classList.remove("hidden");
   rewardOptions.innerHTML = "";
@@ -2217,7 +2244,7 @@ function finishReward() {
   maxFloor = Math.max(maxFloor, floor);
   initLevel(player.name, player.charClass, player.gender, false);
   saveGame();
-  gameState = "PLAYING";
+  setGameState("PLAYING");
   updateMobileControlsVisibility();
   startGameLoop();
 }
@@ -2680,3 +2707,6 @@ if (btnInteract) {
     handleInteraction();
   });
 }
+
+// Initialize state classes on startup
+setGameState("MENU");
