@@ -11,10 +11,11 @@
 html, body {
     margin: 0;
     padding: 0;
-    width: 100%;
-    height: 100%;
+    width: 100dvw;
+    height: 100dvh;
     overflow: hidden;
     touch-action: none;
+    overscroll-behavior: none;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     -khtml-user-select: none;
@@ -180,8 +181,8 @@ button:active {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 100dvw;
+    height: 100dvh;
     image-rendering: pixelated; /* Keeps pixel art sharp */
 }
 
@@ -230,6 +231,31 @@ button:active {
     border: 3px solid #ecf0f1;
     min-width: 400px;
     pointer-events: all; /* IMPORTANTE: Asegura que el contenido reciba clics */
+}
+
+#inv-drop-zone {
+    margin-top: 10px;
+    border: 2px dashed #e74c3c;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.05);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.95rem;
+}
+
+#inv-drop-zone.dragover {
+    background: rgba(231, 76, 60, 0.2);
+    border-color: #c0392b;
+    color: #c0392b;
+    transform: scale(1.02);
 }
 
 .grid-container {
@@ -293,46 +319,177 @@ button:active {
     pointer-events: none;
 }
 
+#hud-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+}
+
 #hud {
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.85);
     padding: 10px 20px;
     border-radius: 8px;
     border: 2px solid var(--border-color);
     display: flex;
+    align-items: center;
     gap: 20px;
     font-size: 1.2rem;
     font-weight: bold;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    pointer-events: auto;
+}
+
+#exp-hud {
+    background-color: rgba(0, 0, 0, 0.85);
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.95rem;
+    font-weight: bold;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    pointer-events: auto;
+    color: #fff;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+#exp-label {
+    color: #2ecc71;
+    text-shadow: 0 0 5px rgba(46, 204, 113, 0.4);
+    white-space: nowrap;
+}
+
+.combat-status-out {
+    color: #2ecc71;
+    text-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+    font-weight: bold;
+    background: rgba(46, 204, 113, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(46, 204, 113, 0.3);
+    white-space: nowrap;
+}
+
+.combat-status-in {
+    color: #e74c3c;
+    text-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+    font-weight: bold;
+    background: rgba(231, 76, 60, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(231, 76, 60, 0.3);
+    animation: pulse-combat 1.5s infinite alternate;
+    white-space: nowrap;
+}
+
+@keyframes pulse-combat {
+    from { box-shadow: 0 0 2px rgba(231, 76, 60, 0.2); }
+    to { box-shadow: 0 0 8px rgba(231, 76, 60, 0.5); }
+}
+
+.exp-bar-container {
+    flex: 1;
+    height: 14px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 150px;
+}
+
+#exp-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #27ae60, #2ecc71);
+    box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+    transition: width 0.3s ease-out;
+}
+
+#exp-values {
+    position: relative;
+    z-index: 1;
+    font-size: 0.75rem;
+    color: #fff;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+    font-family: 'Courier New', Courier, monospace;
+}
+
+
+.hud-actions-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-left: 10px;
+}
+
+#backpack-btn {
+    padding: 4px 10px !important;
+    font-size: 0.85rem !important;
+    background: #8e44ad !important;
+    border-radius: 4px !important;
+    margin: 0 !important;
+    width: auto !important;
+    font-family: inherit;
+    font-weight: bold;
+    color: white;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s, transform 0.1s;
+}
+
+#backpack-btn:hover {
+    background: #9b59b6 !important;
 }
 
 #power-bar {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
     display: flex;
-    gap: 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    padding: 10px;
-    border-radius: 8px;
-    border: 2px solid var(--border-color);
+    gap: 8px;
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+    border: none;
+    position: static;
+    transform: none;
     pointer-events: auto;
 }
 
 .power-slot {
-    width: 50px;
-    height: 50px;
-    background-color: #222;
-    border: 2px solid #555;
-    border-radius: 4px;
+    width: 38px;
+    height: 38px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
     position: relative;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: inset 0 0 6px rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.power-slot:hover {
+    border-color: rgba(255, 255, 255, 0.7);
+    transform: translateY(-2px);
 }
 
 .power-slot.active {
     border-color: #f1c40f;
-    box-shadow: 0 0 10px #f1c40f;
-    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(241, 196, 15, 0.7), inset 0 0 4px rgba(0,0,0,0.8);
+    transform: scale(1.05);
 }
 
 .power-slot.replacing {
@@ -348,14 +505,42 @@ button:active {
 
 .slot-key {
     position: absolute;
-    top: -8px;
-    left: -8px;
-    background-color: #fff;
-    color: #000;
-    font-size: 0.8rem;
-    padding: 2px 5px;
+    bottom: -6px;
+    right: -6px;
+    background-color: #ffffff;
+    color: #000000;
+    font-size: 0.65rem;
+    padding: 1px 4px;
     border-radius: 3px;
     font-weight: bold;
+    border: 1px solid #333;
+    pointer-events: none;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+}
+
+.power-level {
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    background-color: #27ae60;
+    color: #fff;
+    font-size: 0.65rem;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+    border: 1px solid #1e7e43;
+    pointer-events: none;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+}
+
+.power-icon {
+    font-size: 1.3rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
 }
 
 .reward-options {
@@ -396,26 +581,26 @@ button:active {
 /* Mobile Controls styling */
 #mobile-controls {
     position: absolute;
-    bottom: 20px;
+    top: 0;
     left: 0;
-    width: 100%;
-    height: 160px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 30px;
+    width: 100dvw;
+    height: 100dvh;
     pointer-events: none; /* Let empty space pass clicks */
     z-index: 1000;
+    display: none; /* Hidden by default on desktop */
 }
 
-#mobile-controls.hidden {
-    display: none !important;
+/* Show only on touch devices */
+@media (pointer: coarse) {
+    #mobile-controls:not(.hidden) {
+        display: block !important;
+    }
 }
 
-/* Joystick Styling */
+/* Joystick Zone (Left Half of screen) */
 #joystick-zone {
     position: absolute;
-    bottom: 0;
+    top: 0;
     left: 0;
     width: 50%;
     height: 100%;
@@ -423,57 +608,71 @@ button:active {
     user-select: none;
     -webkit-user-select: none;
     z-index: 1001;
+    touch-action: none;
 }
 
 #joystick-base {
     position: absolute;
+    left: 50px;
+    bottom: 50px;
     width: 120px;
     height: 120px;
-    background: rgba(0, 0, 0, 0.4);
-    border: 3px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.25);
     border-radius: 50%;
-    display: none; /* Centered dynamically by JS */
-    transform: translate(-50%, -50%);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    display: block; /* Always visible */
     pointer-events: none;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    z-index: 1002;
+    transition: border-color 0.2s, background 0.2s;
 }
 
 #joystick-knob {
     position: absolute;
     width: 50px;
     height: 50px;
-    background: rgba(255, 255, 255, 0.7);
-    border: 2px solid rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.35);
+    border: 1.5px solid rgba(255, 255, 255, 0.6);
     border-radius: 50%;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     pointer-events: none;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 1003;
 }
 
 /* Touch Action Buttons Layout */
 #touch-actions {
-    display: flex;
-    align-items: flex-end;
-    gap: 20px;
-    pointer-events: auto;
+    position: absolute;
+    bottom: 50px;
+    right: 50px;
+    width: 200px;
+    height: 200px;
+    pointer-events: none;
     user-select: none;
     -webkit-user-select: none;
+    z-index: 1001;
 }
 
 .power-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
 }
 
 .power-btn {
-    width: 40px;
-    height: 40px;
-    border: 2px solid #fff;
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
     color: #fff;
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     font-weight: bold;
     border-radius: 50%;
     display: flex;
@@ -482,32 +681,41 @@ button:active {
     cursor: pointer;
     margin: 0;
     padding: 0;
-    transition: transform 0.1s;
+    transition: transform 0.1s, border-color 0.2s, background 0.2s;
     user-select: none;
     -webkit-user-select: none;
-}
-
-.power-btn:active {
-    transform: scale(0.85);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    pointer-events: auto;
 }
 
 #btn-p1 {
-    background-color: rgba(231, 76, 60, 0.85); /* Fuego */
+    bottom: 125px;
+    right: 35px;
+    background-color: rgba(231, 76, 60, 0.4); /* Fuego */
 }
 #btn-p2 {
-    background-color: rgba(52, 152, 219, 0.85); /* Agua/Hielo */
+    bottom: 35px;
+    right: 125px;
+    background-color: rgba(52, 152, 219, 0.4); /* Agua/Hielo */
 }
 #btn-p3 {
-    background-color: rgba(211, 84, 0, 0.85); /* Tierra/Roca */
+    bottom: 94px;
+    right: 94px;
+    background-color: rgba(211, 84, 0, 0.4); /* Tierra/Roca */
 }
 
 #btn-attack {
-    width: 80px;
-    height: 80px;
-    background: rgba(231, 76, 60, 0.4); /* Transparent red */
-    border: 3px solid rgba(236, 240, 241, 0.6); /* Transparent white */
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 88px;
+    height: 88px;
+    background: rgba(231, 76, 60, 0.25);
+    border: 3px solid rgba(255, 255, 255, 0.3);
     color: rgba(255, 255, 255, 0.9);
-    font-size: 2.2rem;
+    font-size: 2.4rem;
     font-weight: bold;
     border-radius: 50%;
     display: flex;
@@ -516,22 +724,26 @@ button:active {
     cursor: pointer;
     margin: 0;
     padding: 0;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    transition: background 0.1s, transform 0.1s;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    transition: background 0.1s, transform 0.1s, border-color 0.1s;
     user-select: none;
     -webkit-user-select: none;
     touch-action: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: auto;
 }
 
 #btn-attack:active, #btn-attack.pressed {
-    background: rgba(231, 76, 60, 0.85); /* Solid on press */
-    border-color: rgba(236, 240, 241, 0.9);
+    background: rgba(231, 76, 60, 0.7);
+    border-color: rgba(255, 255, 255, 0.8);
     transform: scale(0.9);
 }
 
 .power-btn:active, .power-btn.pressed {
     transform: scale(0.85);
-    background-color: rgba(0, 0, 0, 0.8) !important;
+    border-color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(0, 0, 0, 0.6) !important;
 }
 
 /* Orientation Warning Overlay */
@@ -539,9 +751,9 @@ button:active {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: #0d0d0d;
+    width: 100dvw;
+    height: 100dvh;
+    background: radial-gradient(circle at center, #1c1c1c 0%, #0d0d0d 100%);
     color: #f0f0f0;
     z-index: 100000; /* Extremely high z-index to block everything */
     display: flex;
@@ -552,6 +764,7 @@ button:active {
     padding: 20px;
     font-family: inherit;
     box-sizing: border-box;
+    pointer-events: all; /* Blocks interaction completely */
 }
 
 #orientation-warning.hidden {
@@ -559,30 +772,36 @@ button:active {
 }
 
 #orientation-warning .rotate-icon {
-    font-size: 4rem;
     margin-bottom: 20px;
-    animation: rotateDevice 2s infinite ease-in-out;
+}
+
+#orientation-warning .phone-svg {
+    width: 120px;
+    height: 120px;
+}
+
+#orientation-warning .phone-silhouette {
+    transform-origin: 50px 50px;
+    animation: rotatePhone 2.5s infinite ease-in-out;
 }
 
 #orientation-warning h2 {
     color: var(--primary-color);
-    font-size: 2rem;
+    font-size: 1.8rem;
+    margin-top: 15px;
     margin-bottom: 10px;
     text-transform: uppercase;
     letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
 }
 
-#orientation-warning p {
-    color: #ccc;
-    font-size: 1.1rem;
-    max-width: 80%;
-    line-height: 1.4;
-}
-
-@keyframes rotateDevice {
-    0% { transform: rotate(0deg); }
-    50% { transform: rotate(-90deg); }
-    100% { transform: rotate(0deg); }
+@keyframes rotatePhone {
+    0%, 100% {
+        transform: rotate(0deg);
+    }
+    40%, 60% {
+        transform: rotate(-90deg);
+    }
 }
 
 /* Responsive UI adjustments for mobile screen */
@@ -593,17 +812,19 @@ button:active {
         gap: 8px;
     }
     
-    #power-bar {
-        bottom: auto;
-        top: 60px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 5px;
+    #exp-hud {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+        gap: 6px;
+    }
+
+    .exp-bar-container {
+        height: 10px;
+        min-width: 100px;
     }
     
-    .power-slot {
-        width: 40px;
-        height: 40px;
+    #power-bar {
+        display: none !important;
     }
 
     #inventory-modal {
@@ -624,4 +845,455 @@ button:active {
         height: 40px;
         font-size: 18px;
     }
+
+    #joystick-base {
+        left: 30px;
+        bottom: 30px;
+        width: 100px;
+        height: 100px;
+    }
+    #joystick-knob {
+        width: 40px;
+        height: 40px;
+    }
+    #touch-actions {
+        right: 30px;
+        bottom: 30px;
+        width: 160px;
+        height: 160px;
+    }
+    #btn-attack {
+        width: 70px;
+        height: 70px;
+        font-size: 1.8rem;
+    }
+    .power-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 1rem;
+    }
+    #btn-p1 {
+        bottom: 100px;
+        right: 28px;
+    }
+    #btn-p2 {
+        bottom: 28px;
+        right: 100px;
+    }
+    #btn-p3 {
+        bottom: 75px;
+        right: 75px;
+    }
+    #btn-interact {
+        bottom: 0px;
+        right: 78px;
+        width: 44px;
+        height: 44px;
+        font-size: 1.1rem;
+    }
+    .shop-content {
+        max-height: 90vh;
+        width: 95%;
+        padding: 15px;
+    }
 }
+
+/* ==========================================================================
+   Shop Modal & Mobile Interact Styling
+   ========================================================================== */
+
+#shop-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+#shop-modal.hidden {
+    display: none !important;
+}
+
+.shop-content {
+    background: rgba(30, 39, 46, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 24px;
+    border-radius: 12px;
+    border: 3px solid #f1c40f;
+    width: 90%;
+    max-width: 550px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    pointer-events: all;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(241, 196, 15, 0.15);
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.shop-gold-container {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 10px 15px;
+    border-radius: 6px;
+    margin: 15px 0;
+    font-size: 1.1rem;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid rgba(241, 196, 15, 0.25);
+}
+
+.shop-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.shop-tabs .tab-btn {
+    flex: 1;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid transparent;
+    color: #ccc;
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 6px;
+    margin: 0;
+    text-transform: none;
+    transition: all 0.2s;
+}
+
+.shop-tabs .tab-btn.active {
+    background: #f1c40f;
+    color: #1a1a1a;
+    font-weight: bold;
+    border-color: #f39c12;
+    box-shadow: 0 0 10px rgba(241, 196, 15, 0.3);
+}
+
+.shop-tabs .tab-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+
+.shop-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 250px;
+}
+
+.shop-panel.hidden {
+    display: none !important;
+}
+
+.shop-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 5px;
+}
+
+/* Shop Item Styling */
+.shop-item {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s;
+}
+
+.shop-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(241, 196, 15, 0.35);
+}
+
+.shop-item-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.shop-item-icon {
+    font-size: 1.8rem;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.shop-item-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.shop-item-name {
+    font-weight: bold;
+    color: #fff;
+    font-size: 0.95rem;
+}
+
+.shop-item-desc {
+    font-size: 0.75rem;
+    color: #bbb;
+}
+
+.shop-item-action {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.shop-item-price {
+    font-weight: bold;
+    color: #f1c40f;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.shop-item-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    background: #27ae60;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    text-transform: none;
+    margin: 0;
+    width: auto;
+    transition: all 0.2s;
+}
+
+.shop-item-btn:hover:not(:disabled) {
+    background: #2ecc71;
+}
+
+.shop-item-btn:disabled {
+    background: #7f8c8d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Rarity classes matching item rarities */
+.rarity-common { color: #bdc3c7; }
+.rarity-rare { color: #3498db; text-shadow: 0 0 5px rgba(52, 152, 219, 0.3); }
+.rarity-very_rare { color: #9b59b6; text-shadow: 0 0 5px rgba(155, 89, 182, 0.3); }
+.rarity-epic { color: #e67e22; text-shadow: 0 0 6px rgba(230, 126, 34, 0.3); }
+.rarity-legendary { color: #f1c40f; text-shadow: 0 0 8px rgba(241, 196, 15, 0.4); }
+
+
+.shop-list::-webkit-scrollbar {
+    width: 6px;
+}
+.shop-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+.shop-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+.shop-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Mobile Interact Button */
+#btn-interact {
+    position: absolute;
+    bottom: 0px;
+    right: 105px;
+    width: 52px;
+    height: 52px;
+    background: rgba(46, 204, 113, 0.3);
+    border: 2.5px solid rgba(255, 255, 255, 0.4);
+    color: white;
+    font-size: 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    z-index: 1002;
+    pointer-events: auto;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s, border-color 0.2s, background-color 0.2s;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+#btn-interact:active, #btn-interact.pressed {
+    transform: scale(0.85);
+    background-color: rgba(46, 204, 113, 0.75);
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+#btn-interact.hidden {
+    display: none !important;
+}
+
+/* Structured Equipment Styles */
+.equip-cat-title {
+    font-size: 0.75rem;
+    color: #95a5a6;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+    font-weight: bold;
+}
+
+.equip-grid-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 3px;
+}
+
+.eq-slot {
+    opacity: 0.35;
+    transition: all 0.2s ease;
+    background: rgba(52, 73, 94, 0.4);
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+}
+
+.eq-slot:hover {
+    opacity: 0.7;
+    border-color: rgba(241, 196, 15, 0.5);
+    background: rgba(52, 73, 94, 0.6);
+}
+
+.eq-slot.equipped {
+    opacity: 1 !important;
+    border: 2px solid #7f8c8d;
+    background: #34495e;
+}
+
+.eq-slot.equipped:hover {
+    border-color: #f1c40f;
+}
+
+.weapon-slot {
+    border-style: dashed;
+}
+
+.weapon-slot.equipped {
+    border-style: solid;
+}
+
+/* Rarity colors and glows for equipment slots */
+.eq-slot.equipped.rarity-common {
+    border: 2px solid #7f8c8d !important;
+    box-shadow: none !important;
+}
+
+.eq-slot.equipped.rarity-rare {
+    border: 2px solid #3498db !important;
+    box-shadow: 0 0 10px rgba(52, 152, 219, 0.6) !important;
+}
+
+.eq-slot.equipped.rarity-very_rare {
+    border: 2px solid #9b59b6 !important;
+    box-shadow: 0 0 12px rgba(155, 89, 182, 0.7) !important;
+}
+
+.eq-slot.equipped.rarity-epic {
+    border: 2px solid #e67e22 !important;
+    box-shadow: 0 0 15px rgba(230, 126, 34, 0.8) !important;
+}
+
+.eq-slot.equipped.rarity-legendary {
+    border: 2px solid #f1c40f !important;
+    box-shadow: 0 0 18px rgba(241, 196, 15, 0.9) !important;
+}
+
+/* Tooltip container styling */
+#item-tooltip {
+    position: fixed;
+    z-index: 100000;
+    background: rgba(20, 20, 20, 0.95);
+    border: 2px solid #7f8c8d;
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #fff;
+    pointer-events: none; /* Let pointer events pass through to avoid flickering */
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9rem;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.8);
+    max-width: 250px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#item-tooltip.hidden {
+    display: none !important;
+}
+
+.tooltip-name {
+    font-weight: bold;
+    font-size: 1rem;
+    text-transform: capitalize;
+}
+
+.tooltip-rarity {
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.tooltip-divider {
+    border: 0;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 4px 0;
+}
+
+.tooltip-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: #2ecc71; /* Green color for positive stats */
+    font-weight: bold;
+}
+
+.tooltip-desc {
+    font-size: 0.75rem;
+    color: #bdc3c7;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* Specific text color for tooltip rarities */
+.tooltip-rarity.rarity-common { color: #bdc3c7; }
+.tooltip-rarity.rarity-rare { color: #3498db; text-shadow: 0 0 5px rgba(52, 152, 219, 0.3); }
+.tooltip-rarity.rarity-very_rare { color: #9b59b6; text-shadow: 0 0 5px rgba(155, 89, 182, 0.3); }
+.tooltip-rarity.rarity-epic { color: #e67e22; text-shadow: 0 0 6px rgba(230, 126, 34, 0.3); }
+.tooltip-rarity.rarity-legendary { color: #f1c40f; text-shadow: 0 0 8px rgba(241, 196, 15, 0.4); }
+
+
+

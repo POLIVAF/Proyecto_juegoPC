@@ -41,7 +41,7 @@ class Floor10Boss extends Boss {
             let dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist < 20) {
-                player.hp -= 15; // Daño del proyectil
+                player.hp -= Math.max(1, 15 - player.getArmor()); // Daño del proyectil
                 this.projectiles.splice(i, 1);
                 continue;
             }

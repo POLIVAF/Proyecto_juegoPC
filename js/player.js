@@ -9,6 +9,12 @@ class Player {
         this.charClass = charClass;
         this.gender = gender;
 
+        // RPG experience and progression properties
+        this.level = 1;
+        this.exp = 0;
+        this.nextLevelExp = 300;
+        this.levelUpGlowTimer = 0;
+
         // --- SISTEMA DE RESERVA Y DEFENSA ---
         this.reserveHearts = []; // Slots de 100 HP (Piso 10 y 15)
         this.maxReserveSlots = 5;
@@ -19,8 +25,10 @@ class Player {
         
         // Base stats based on class
         if (this.charClass === 'warrior') {
+            this.baseMaxHp = 150;
             this.maxHp = 150;
             this.hp = 150;
+            this.baseMaxMana = 50;
             this.maxMana = 50;
             this.mana = 50;
             this.speed = 3;
@@ -28,8 +36,10 @@ class Player {
             this.damage = 25;
             this.color = this.gender === 'male' ? '#e74c3c' : '#c0392b'; // Reds
         } else { // Mage
+            this.baseMaxHp = 80;
             this.maxHp = 80;
             this.hp = 80;
+            this.baseMaxMana = 150;
             this.maxMana = 150;
             this.mana = 150;
             this.speed = 4;
@@ -40,15 +50,49 @@ class Player {
 
         // Inventory & Stats
         this.damage = this.baseDamage;
+        this.coins = 0;
         this.inventory = []; // Max 15 items
         this.inventoryMaxSlots = 15;
         this.isInventoryOpen = false; // Controla si se ve la mochila
-        this.equipment = []; // Max 4 weapons/armor
+        
+        // Structured Equipment Object (9 Slots)
+        this.equipment = {
+            head: null,
+            chest: null,
+            legs: null,
+            gloves: null,
+            ring: null,
+            ring2: null,
+            pendant: null,
+            pendant2: null,
+            weapon: null
+        };
+
+        // Equip Class Starter Weapon (without modifiers)
+        if (this.charClass === 'warrior') {
+            this.equipment.weapon = {
+                type: 'weapon',
+                name: 'Espada de Dos Manos Básica',
+                color: '#bdc3c7',
+                bonus: 0,
+                desc: 'Arma inicial sin modificadores.'
+            };
+        } else {
+            this.equipment.weapon = {
+                type: 'weapon',
+                name: 'Bastón de Mago Básico',
+                color: '#bdc3c7',
+                bonus: 0,
+                desc: 'Bastón inicial sin modificadores.'
+            };
+        }
+
+        this.damage = this.getDamage();
         this.immunityTimer = 0;
-        this.idleTimer = 0;
         this.poisonTimer = 0;
         this.stunTimer = 0;
-
+        this.stunImmunityTimer = 0;
+        
         // Projectiles for mage
         this.projectiles = [];
         this.facing = { x: 0, y: 1 };
@@ -60,6 +104,126 @@ class Player {
         this.activePowerIndex = 0;
         this.furyAuraTimer = 0;
         this.hitEnemies = [];
+
+        // Combat & Regeneration states
+        this.combatTimer = 0;
+        this.lastDamageTimer = 0;
+        this.stillTimer = 0;
+        this.lastHp = this.hp;
+    }
+
+    gainExp(amount) {
+        if (this.level === undefined) this.level = 1;
+        if (this.exp === undefined) this.exp = 0;
+        if (this.nextLevelExp === undefined) this.nextLevelExp = 300;
+
+        this.exp += amount;
+        let leveledUp = false;
+
+        while (this.exp >= this.nextLevelExp) {
+            this.exp -= this.nextLevelExp;
+            this.level++;
+            this.nextLevelExp *= 2; // Doubled each level
+
+            // Level Up Stats Boost
+            if (this.charClass === 'warrior') {
+                this.baseMaxHp += 20;
+                this.baseMaxMana += 5;
+                this.baseDamage += 3;
+            } else { // Mage
+                this.baseMaxHp += 10;
+                this.baseMaxMana += 15;
+                this.baseDamage += 2;
+            }
+            leveledUp = true;
+        }
+
+        if (leveledUp) {
+            this.recalculateStats();
+            this.hp = this.maxHp; // Full heal
+            this.mana = this.maxMana; // Full mana restore
+            this.levelUpGlowTimer = 60; // 1 second animation at 60 FPS
+            
+            // Add visual floating text on player
+            if (typeof addFloatingText === 'function') {
+                addFloatingText("¡SUBIDA DE NIVEL! ⭐", this.x, this.y - 30, "#f1c40f");
+            }
+            
+            // Play synthesized level up chime
+            if (typeof playLevelUpSound === 'function') {
+                playLevelUpSound();
+            }
+        }
+        
+        // Save progression automatically
+        if (typeof saveGame === 'function') {
+            saveGame();
+        }
+    }
+
+    recalculateStats() {
+        if (this.baseMaxHp === undefined) this.baseMaxHp = this.charClass === 'warrior' ? 150 : 80;
+        if (this.baseMaxMana === undefined) this.baseMaxMana = this.charClass === 'warrior' ? 50 : 150;
+
+        let extraHp = 0;
+        let extraMana = 0;
+        let totalFuerza = 0;
+        let totalDmgPercent = 0;
+        let totalDefense = 0;
+        let totalCooldownReduction = 0; // in %
+
+        if (this.equipment) {
+            for (let slot in this.equipment) {
+                let eq = this.equipment[slot];
+                if (!eq) continue;
+
+                // Flat bonus from existing items
+                if (eq.bonus !== undefined) {
+                    totalDmgPercent += eq.bonus;
+                }
+
+                // Stats from accessories
+                if (eq.stats) {
+                    if (eq.stats.fuerza) totalFuerza += eq.stats.fuerza;
+                    if (eq.stats.daño) totalDmgPercent += eq.stats.daño / 100;
+                    if (eq.stats.defensa) totalDefense += eq.stats.defensa;
+                    if (eq.stats.mana) extraMana += eq.stats.mana;
+                    if (eq.stats.vida) extraHp += eq.stats.vida;
+                    if (eq.stats.cooldown) totalCooldownReduction += eq.stats.cooldown;
+                }
+            }
+        }
+
+        // Apply Strength (fuerza): +2% damage per point
+        totalDmgPercent += totalFuerza * 0.02;
+
+        this.maxHp = this.baseMaxHp + extraHp;
+        this.maxMana = this.baseMaxMana + extraMana;
+
+        // Keep current HP and Mana capped
+        this.hp = Math.min(this.maxHp, this.hp);
+        this.mana = Math.min(this.maxMana, this.mana);
+
+        // Damage calculation
+        this.damage = this.baseDamage * (1 + totalDmgPercent);
+
+        // Defense calculations
+        this.accessoryDefense = totalDefense;
+        this.cooldownReduction = Math.min(50, totalCooldownReduction); // cap at 50%
+    }
+
+    getArmor() {
+        return (this.armor || 0) + (this.accessoryDefense || 0);
+    }
+
+    getCooldown(baseCooldown) {
+        let reduction = this.cooldownReduction || 0; // in percent
+        return Math.max(5, Math.round(baseCooldown * (1 - reduction / 100)));
+    }
+
+    getDamage() {
+        this.recalculateStats();
+        return this.damage;
     }
 
     update(keys, mouse, camera, dungeon, deltaTime) {
@@ -73,9 +237,16 @@ class Player {
             this.furyAuraTimer--;
         }
         
+        if (this.stunImmunityTimer > 0) {
+            this.stunImmunityTimer--;
+        }
+
         if (this.stunTimer > 0) {
             this.stunTimer--;
             this.isAttacking = false;
+            if (this.stunTimer <= 0) {
+                this.stunImmunityTimer = 60; // 1 second immunity after stun ends
+            }
             return; // Cannot move or attack while stunned
         }
 
@@ -132,20 +303,44 @@ class Player {
                 this.facing.x /= fLen;
                 this.facing.y /= fLen;
             }
-            this.idleTimer = 0; // Reset idle
-        } else {
-            this.idleTimer++;
-            // Regenerate HP and Mana if idle for 1 second (approx 60 frames)
-            if (this.idleTimer >= 60) {
-                if (this.idleTimer % 30 === 0) { // Every half second after 1s
-                    this.hp = Math.min(this.maxHp, this.hp + 1);
-                    this.mana = Math.min(this.maxMana, this.mana + 1);
-                }
-            }
         }
+
+        // Detect damage received (if current hp is less than lastHp)
+        if (this.hp < this.lastHp) {
+            this.lastDamageTimer = 180; // 3 seconds of lockout at 60 FPS
+            this.combatTimer = 300;     // 5 seconds of combat at 60 FPS
+            this.stillTimer = 0;
+        }
+        this.lastHp = this.hp;
+
+        // Decrement combat and damage lockouts
+        if (this.combatTimer > 0) this.combatTimer--;
+        if (this.lastDamageTimer > 0) this.lastDamageTimer--;
+
+        // Determine if player is standing still (quieto)
+        if (dx === 0 && dy === 0 && !this.isAttacking) {
+            this.stillTimer++;
+        } else {
+            this.stillTimer = 0;
+        }
+
+        // Automatic health regeneration
+        // Active if: (out of combat OR standing still for 1.5s/90 frames) AND no damage in last 3s
+        if (this.lastDamageTimer <= 0 && (this.combatTimer <= 0 || this.stillTimer >= 90)) {
+            let regenRate = this.stillTimer >= 90 ? 0.03 : 0.015; // 3% if still, 1.5% if out of combat and moving
+            this.hp = Math.min(this.maxHp, this.hp + (regenRate * this.maxHp) / 60);
+        }
+
+        // Automatic mana regeneration
+        // Active at 3% when out of combat OR standing still for 1.5s, otherwise 1% when in combat
+        let manaRegenRate = (this.combatTimer <= 0 || this.stillTimer >= 90) ? 0.03 : 0.01;
+        this.mana = Math.min(this.maxMana, this.mana + (manaRegenRate * this.maxMana) / 60);
         
         if (this.immunityTimer > 0) {
             this.immunityTimer--;
+        }
+        if (this.flashTimer > 0) {
+            this.flashTimer--;
         }
 
         let newX = this.x + dx * currentSpeed;
@@ -163,11 +358,10 @@ class Player {
                 this.y = newY;
             }
         }
-        
         // Attack logic via Spacebar
         if (keys[' '] && this.attackTimer <= 0) {
             this.attack(dungeon);
-            this.attackTimer = 30; // cooldown
+            this.attackTimer = this.getCooldown(30); // cooldown
         }
 
         // Attack logic via Mouse Click or Hold
@@ -191,7 +385,7 @@ class Player {
             }
 
             this.attack(dungeon);
-            this.attackTimer = 30;
+            this.attackTimer = this.getCooldown(30);
         }
 
         if (this.attackTimer > 0) this.attackTimer--;
@@ -210,6 +404,8 @@ class Player {
     }
 
     attack(dungeon) {
+        this.combatTimer = 300; // 5 seconds at 60 FPS
+        this.stillTimer = 0;
         let activePower = this.powers[this.activePowerIndex];
         let requestedPower = activePower ? activePower.id : 'none';
         
@@ -240,34 +436,28 @@ class Player {
             }
         }
         
-        // Calculate Equipment Bonus
-        let equipBonus = 0;
-        for (let eq of this.equipment) {
-            if (eq.type === 'weapon') equipBonus += 5;
-        }
-        
         let multiplier = 1 + (powerLevel - 1) * 0.2;
         
         if (this.currentAttackPower === 'wind') {
             // Wind Power: Aura of immunity, no attack
             this.immunityTimer = (1.5 + (powerLevel * 0.2)) * 60; // Frames (assuming 60fps)
-            this.attackTimer = 30;
+            this.attackTimer = this.getCooldown(30);
             this.isAttacking = false;
             return;
         }
 
         if (this.charClass === 'warrior') {
             // Melee attack
-            let bDamage = 10;
-            if (this.currentAttackPower === 'fire') bDamage = 15;
-            if (this.currentAttackPower === 'water') bDamage = 12;
-            if (this.currentAttackPower === 'earth') bDamage = 15;
+            let factor = 1.0;
+            if (this.currentAttackPower === 'fire') factor = 1.5;
+            if (this.currentAttackPower === 'water') factor = 1.2;
+            if (this.currentAttackPower === 'earth') factor = 1.5;
             
             // Warrior specific powers
             if (this.currentAttackPower === 'double_strike') {
-                bDamage = 20; // Deals double damage (2 hits combined)
+                factor = 2.0; // Deals double damage
             } else if (this.currentAttackPower === 'charge') {
-                bDamage = 14;
+                factor = 1.4;
                 // Dash/Charge forward checking wall collision in steps
                 if (dungeon) {
                     let dashDistance = 80;
@@ -284,25 +474,26 @@ class Player {
                     }
                 }
             } else if (this.currentAttackPower === 'knockback') {
-                bDamage = 15;
+                factor = 1.5;
             } else if (this.currentAttackPower === 'fury') {
-                // Fury buff: increases current player damage by 2%
-                this.damage = this.damage * 1.02;
+                // Fury buff: permanently increases baseDamage by 2%
+                this.baseDamage = this.baseDamage * 1.02;
+                this.damage = this.getDamage();
                 this.furyAuraTimer = 60; // 1 second red aura
-                this.attackTimer = 30;
+                this.attackTimer = this.getCooldown(30);
                 this.isAttacking = false;
-                console.log("¡Furia activa! Daño aumentado a: " + Math.round(this.damage));
+                console.log("¡Furia activa! Daño base permanentemente aumentado a: " + Math.round(this.baseDamage));
                 return;
             }
 
-            this.damage = (bDamage + equipBonus) * multiplier;
+            this.damage = this.getDamage() * factor * multiplier;
 
             if (this.currentAttackPower === 'water') {
-                this.attackTimer = 15; // Faster
+                this.attackTimer = this.getCooldown(15); // Faster
             } else if (this.currentAttackPower === 'earth') {
-                this.attackTimer = 45; // Slower
+                this.attackTimer = this.getCooldown(45); // Slower
             } else {
-                this.attackTimer = 30; // Normal
+                this.attackTimer = this.getCooldown(30); // Normal
             }
 
             setTimeout(() => {
@@ -310,7 +501,7 @@ class Player {
             }, 200); // Attack animation duration
         } else if (this.charClass === 'mage') {
             // Ranged attack
-            let bDamage = 10;
+            let factor = 1.0;
             let pColor = '#fff';
             let pSpeed = 6;
             let pRadius = 5;
@@ -318,17 +509,17 @@ class Player {
             if (this.currentAttackPower === 'fire') {
                 pColor = '#e74c3c';
                 pSpeed = 8;
-                bDamage = 15;
+                factor = 1.5;
             } else if (this.currentAttackPower === 'water') {
                 pColor = '#3498db';
-                this.attackTimer = 10; // Rapid fire
-                bDamage = 12;
+                this.attackTimer = this.getCooldown(10); // Rapid fire
+                factor = 1.2;
             } else if (this.currentAttackPower === 'earth') {
                 pColor = '#d35400';
                 pRadius = 15; // Bigger
                 pSpeed = 4; // Slower
-                this.attackTimer = 45; // Slower casting
-                bDamage = 15;
+                this.attackTimer = this.getCooldown(45); // Slower casting
+                factor = 1.5;
             }
 
             this.projectiles.push({
@@ -339,7 +530,7 @@ class Player {
                 radius: pRadius,
                 color: pColor,
                 power: this.currentAttackPower,
-                damage: (bDamage + equipBonus) * multiplier,
+                damage: this.getDamage() * factor * multiplier,
                 life: 60
             });
             setTimeout(() => {
@@ -429,6 +620,35 @@ class Player {
             ctx.beginPath();
             ctx.arc(p.x - camera.x, p.y - camera.y, p.radius, 0, Math.PI * 2);
             ctx.fill();
+        }
+
+        // Draw Level Up Glow Effect
+        if (this.levelUpGlowTimer > 0) {
+            this.levelUpGlowTimer--;
+            
+            let alpha = this.levelUpGlowTimer / 60;
+            
+            // Semi-transparent golden pillar
+            ctx.fillStyle = `rgba(241, 196, 15, ${alpha * 0.45})`;
+            ctx.fillRect(drawX - 25, drawY - 100, 50, 115);
+            
+            // Glowing expand rings
+            ctx.strokeStyle = `rgba(241, 196, 15, ${alpha})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(drawX, drawY, 20 + (60 - this.levelUpGlowTimer) * 0.75, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.lineWidth = 1;
+            
+            // Floating stars (✨) rising
+            ctx.fillStyle = `rgba(241, 196, 15, ${alpha})`;
+            ctx.font = "12px sans-serif";
+            ctx.textAlign = "center";
+            for (let i = 0; i < 5; i++) {
+                let sparkY = drawY - 10 - ((60 - this.levelUpGlowTimer) * 1.8 + i * 15) % 90;
+                let sparkX = drawX + Math.sin((60 - this.levelUpGlowTimer) * 0.15 + i) * 20;
+                ctx.fillText("✨", sparkX, sparkY);
+            }
         }
     }
 }

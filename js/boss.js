@@ -144,7 +144,7 @@ class Boss {
                     let dy = player.y - this.attackArea.y;
                     let dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist < this.attackArea.radius + player.width/2) {
-                        player.hp -= this.attackArea.damage;
+                        player.hp -= Math.max(1, this.attackArea.damage - player.getArmor());
                     }
                     this.attackArea = null;
                     this.state = 'RECOVERY';
@@ -180,7 +180,7 @@ class Boss {
                     let dy = player.y - this.attackArea.y;
                     let dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist < this.attackArea.radius + player.width/2) {
-                        player.hp -= this.attackArea.damage;
+                        player.hp -= Math.max(1, this.attackArea.damage - player.getArmor());
                     }
                     this.attackArea = null;
                     this.isImmune = false;
@@ -246,5 +246,14 @@ class Boss {
             ctx.fillStyle = 'red';
             ctx.fillRect(drawX - 30, drawY - 40, 60 * (this.hp / this.maxHp), 6);
         }
+    }
+
+    getExpReward(floor) {
+        if (this.constructor.name === 'BossFloor15') {
+            return 1200;
+        } else if (this.constructor.name === 'Floor10Boss') {
+            return 500;
+        }
+        return 150 * floor;
     }
 }

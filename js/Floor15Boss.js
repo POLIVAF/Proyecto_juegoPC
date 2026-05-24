@@ -110,7 +110,7 @@ class BossFloor15 extends Boss {
             // Colisión simple
             let dist = Math.sqrt((p.x - player.x)**2 + (p.y - player.y)**2);
             if (dist < 25) {
-                player.hp -= 8;
+                player.hp -= Math.max(1, 8 - player.getArmor());
                 this.projectiles.splice(i, 1);
                 continue;
             }
@@ -129,7 +129,7 @@ class BossFloor15 extends Boss {
             
             if (l.timer === 0) {
                 let dist = Math.sqrt((player.x - l.x)**2 + (player.y - l.y)**2);
-                if (dist < 45) player.hp -= 25;
+                if (dist < 45) player.hp -= Math.max(1, 25 - player.getArmor());
             }
             
             if (l.timer < -15) this.lightningStrikes.splice(i, 1);

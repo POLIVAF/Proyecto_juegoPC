@@ -30,6 +30,15 @@ class Enemy {
             this.color = '#2980b9'; // Blue
         }
         
+        // 10% chance to be an Elite enemy
+        this.isElite = Math.random() < 0.10;
+        if (this.isElite) {
+            this.hp *= 2;
+            this.damage *= 1.5;
+            this.width *= 1.25;
+            this.height *= 1.25;
+        }
+
         this.maxHp = this.hp;
         
         // simple wandering state
@@ -196,6 +205,17 @@ class Enemy {
 
         ctx.fillRect(drawX - this.width/2 + offsetX, drawY - this.height/2, this.width, this.height);
 
+        // Draw Elite Aura/Crown
+        if (this.isElite) {
+            ctx.strokeStyle = '#f1c40f';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(drawX - this.width/2 + offsetX, drawY - this.height/2, this.width, this.height);
+            ctx.lineWidth = 1;
+
+            ctx.font = '12px sans-serif';
+            ctx.fillText('👑', drawX - 6, drawY - this.height/2 - 10);
+        }
+
         // Dizzy stars if stunned
         if (this.stunTimer > 0) {
             ctx.fillStyle = '#f1c40f';
@@ -210,5 +230,18 @@ class Enemy {
             ctx.fillStyle = 'green';
             ctx.fillRect(drawX - 10, drawY - 15, 20 * (this.hp / this.maxHp), 3);
         }
+    }
+
+    getExpReward(floor) {
+        let baseExp = 15;
+        if (this.type === 'poison') baseExp = 20;
+        else if (this.type === 'shooter') baseExp = 25;
+        else if (this.type === 'stun') baseExp = 30;
+
+        let totalExp = baseExp * (1 + (floor - 1) * 0.3);
+        if (this.isElite) {
+            totalExp *= 2.5;
+        }
+        return Math.round(totalExp);
     }
 }
