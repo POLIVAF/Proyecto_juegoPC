@@ -294,15 +294,45 @@ class Player {
             }
         }
 
-        // Keep track of facing for attacks
-        if (dx !== 0 || dy !== 0) {
-            this.facing = { x: dx, y: dy };
-            // Normalize facing direction
-            let fLen = Math.sqrt(this.facing.x * this.facing.x + this.facing.y * this.facing.y);
-            if (fLen > 0) {
-                this.facing.x /= fLen;
-                this.facing.y /= fLen;
+        // Find closest enemy for auto-aim
+        let closestEnemy = null;
+        let closestDist = 250;
+        if (typeof enemies !== 'undefined') {
+            for (let enemy of enemies) {
+                if (!enemy || enemy.hp <= 0) continue;
+                let edx = enemy.x - this.x;
+                let edy = enemy.y - this.y;
+                let dist = Math.sqrt(edx * edx + edy * edy);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestEnemy = enemy;
+                }
             }
+        }
+
+        // Keep track of facing for attacks
+        if (closestEnemy && (this.isAttacking || this.attackTimer > 0)) {
+            // Smoothly rotate towards the target during attacks
+            let targetDx = closestEnemy.x - this.x;
+            let targetDy = closestEnemy.y - this.y;
+            let targetLen = Math.sqrt(targetDx * targetDx + targetDy * targetDy);
+            if (targetLen > 0) {
+                let targetX = targetDx / targetLen;
+                let targetY = targetDy / targetLen;
+                let lerpRate = 0.25; // Smooth rotation interpolation rate
+                this.facing.x += (targetX - this.facing.x) * lerpRate;
+                this.facing.y += (targetY - this.facing.y) * lerpRate;
+            }
+        } else if (dx !== 0 || dy !== 0) {
+            // Normal movement facing when not attacking
+            this.facing = { x: dx, y: dy };
+        }
+
+        // Normalize facing direction
+        let fLen = Math.sqrt(this.facing.x * this.facing.x + this.facing.y * this.facing.y);
+        if (fLen > 0) {
+            this.facing.x /= fLen;
+            this.facing.y /= fLen;
         }
 
         // Detect damage received (if current hp is less than lastHp)
@@ -360,16 +390,18 @@ class Player {
         }
         // Attack logic via Spacebar
         if (keys[' '] && this.attackTimer <= 0) {
-            this.attack(dungeon);
+            this.attack(dungeon, true); // Auto-aim!
             this.attackTimer = this.getCooldown(30); // cooldown
         }
 
         // Attack logic via Mouse Click or Hold
         let wantsAttack = mouse.clicked || (window.touchAttackHeld && this.attackTimer <= 0);
         if (wantsAttack && this.attackTimer <= 0) {
+            let useAutoAim = false;
             if (mouse.isVirtualButton || window.touchAttackHeld) {
                 // Virtual attack button preserves current facing direction
                 mouse.isVirtualButton = false;
+                useAutoAim = true; // Auto-aim!
             } else {
                 // Calculate direction from player to mouse
                 let playerScreenX = this.x - camera.x;
@@ -382,9 +414,10 @@ class Player {
                 if (length > 0) {
                     this.facing = { x: aimX / length, y: aimY / length };
                 }
+                useAutoAim = false; // Manual aim
             }
 
-            this.attack(dungeon);
+            this.attack(dungeon, useAutoAim);
             this.attackTimer = this.getCooldown(30);
         }
 
@@ -403,9 +436,36 @@ class Player {
         }
     }
 
-    attack(dungeon) {
+    attack(dungeon, useAutoAim = true) {
         this.combatTimer = 300; // 5 seconds at 60 FPS
         this.stillTimer = 0;
+
+        if (useAutoAim) {
+            // Find closest enemy for auto-aim snap on initiation
+            let closestEnemy = null;
+            let closestDist = 250;
+            if (typeof enemies !== 'undefined') {
+                for (let enemy of enemies) {
+                    if (!enemy || enemy.hp <= 0) continue;
+                    let edx = enemy.x - this.x;
+                    let edy = enemy.y - this.y;
+                    let dist = Math.sqrt(edx * edx + edy * edy);
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closestEnemy = enemy;
+                    }
+                }
+            }
+
+            if (closestEnemy) {
+                let targetDx = closestEnemy.x - this.x;
+                let targetDy = closestEnemy.y - this.y;
+                let targetLen = Math.sqrt(targetDx * targetDx + targetDy * targetDy);
+                if (targetLen > 0) {
+                    this.facing = { x: targetDx / targetLen, y: targetDy / targetLen };
+                }
+            }
+        }
         let activePower = this.powers[this.activePowerIndex];
         let requestedPower = activePower ? activePower.id : 'none';
         

@@ -833,21 +833,49 @@ html.menu-active, body.menu-active {
 
 /* Responsive UI adjustments for mobile screen */
 @media (max-width: 768px) {
+    #game-ui {
+        padding: 5px !important;
+    }
+
+    #hud-container {
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 6px !important;
+    }
+
     #hud {
-        font-size: 0.9rem;
-        padding: 5px 10px;
-        gap: 8px;
+        font-size: 0.8rem !important;
+        padding: 4px 8px !important;
+        gap: 10px !important;
+    }
+
+    .hud-info {
+        font-size: 0.75rem !important;
+    }
+    
+    #backpack-btn {
+        padding: 3px 6px !important;
+        font-size: 0.75rem !important;
+    }
+
+    .combat-status-out, .combat-status-in {
+        font-size: 0.7rem !important;
+        padding: 2px 4px !important;
     }
     
     #exp-hud {
-        font-size: 0.75rem;
-        padding: 4px 10px;
-        gap: 6px;
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+        gap: 6px !important;
     }
 
     .exp-bar-container {
-        height: 10px;
-        min-width: 100px;
+        height: 6px !important;
+        min-width: 80px !important;
+    }
+
+    #exp-values {
+        display: none !important;
     }
     
     #power-bar {
