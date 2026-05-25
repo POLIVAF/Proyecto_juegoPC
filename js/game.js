@@ -539,11 +539,18 @@ resize();
 // Input
 window.addEventListener("keydown", (e) => {
   keys[e.key] = true;
+  if (typeof e.key === "string") {
+    keys[e.key.toLowerCase()] = true;
+  }
+  if (e.code) {
+    keys[e.code] = true;
+  }
 
   if (e.key === 'Escape') {
     const inventoryModal = document.getElementById("inventory-modal");
     if (inventoryModal) {
       inventoryModal.classList.add("hidden");
+      if (canvas) canvas.focus();
     }
   }
   
@@ -555,6 +562,7 @@ window.addEventListener("keydown", (e) => {
         updateInventoryUI(); // Refresh items on open
       } else {
         inventoryModal.classList.add("hidden");
+        if (canvas) canvas.focus();
       }
     }
   }
@@ -563,7 +571,26 @@ window.addEventListener("keydown", (e) => {
     handleInteraction();
   }
 });
-window.addEventListener("keyup", (e) => (keys[e.key] = false));
+window.addEventListener("keyup", (e) => {
+  keys[e.key] = false;
+  if (typeof e.key === "string") {
+    keys[e.key.toLowerCase()] = false;
+  }
+  if (e.code) {
+    keys[e.code] = false;
+  }
+});
+window.addEventListener("blur", () => {
+  keys = {};
+});
+if (canvas) {
+  canvas.addEventListener("click", () => {
+    canvas.focus();
+  });
+  canvas.addEventListener("touchstart", () => {
+    canvas.focus();
+  }, { passive: true });
+}
 window.addEventListener("mousemove", (e) => {
   mouse.x = e.clientX;
   mouse.y = e.clientY;
@@ -614,6 +641,10 @@ if (characterForm) {
 
     console.log("Iniciando aventura...");
     currentSaveSlot = 1;
+    
+    // Entrar en modo pantalla completa
+    enterFullscreen();
+    
     startGame(name, charClass, gender, 1, [], null, true);
   });
 }
@@ -624,6 +655,10 @@ if (continueBtn) {
     const saved = localStorage.getItem(`isekaiSave_1`);
     if (saved) {
       const data = JSON.parse(saved);
+      
+      // Entrar en modo pantalla completa
+      enterFullscreen();
+      
       startGame(data.name, data.charClass, data.gender, data.floor || 1, data.powers || [], data.hp, false);
     }
   });
@@ -707,6 +742,9 @@ function resetPlayerOnDeath(player) {
 const restartBtn = document.getElementById("restart-btn");
 if (restartBtn) {
   restartBtn.addEventListener("click", () => {
+    // Entrar en modo pantalla completa
+    enterFullscreen();
+
     // EXP Penalty: Pisos 1-5 pierden 50, 6-10 pierden 100, etc.
     let loss = 50 * Math.ceil(floor / 5);
     player.exp = Math.max(0, player.exp - loss);
@@ -734,7 +772,11 @@ if (restartBtn) {
       gameOverScreen.classList.add("hidden");
     }
     if (gameUi) gameUi.classList.remove("hidden");
-    if (canvas) canvas.classList.remove("hidden");
+    if (canvas) {
+      canvas.classList.remove("hidden");
+      document.activeElement.blur();
+      canvas.focus();
+    }
 
     setGameState("PLAYING");
     updateMobileControlsVisibility();
@@ -749,7 +791,11 @@ if (restartBtn) {
 function startGame(name, charClass, gender, startFloor, powers, hp, newPlayer) {
   if (mainMenu) mainMenu.classList.add("hidden");
   if (gameUi) gameUi.classList.remove("hidden");
-  if (canvas) canvas.classList.remove("hidden");
+  if (canvas) {
+    canvas.classList.remove("hidden");
+    document.activeElement.blur();
+    canvas.focus();
+  }
 
   floor = startFloor;
   
@@ -1006,6 +1052,15 @@ function initLevel(name, charClass, gender, newPlayer) {
 
   if (hudName) hudName.innerText = player.name;
   if (hudClass) hudClass.innerText = player.charClass.toUpperCase();
+  
+  const avatarEl = document.getElementById("hud-avatar-icon");
+  if (avatarEl) {
+    if (player.charClass === "mage") {
+      avatarEl.innerText = player.gender === "female" ? "🧙‍♀️" : "🧙‍♂️";
+    } else {
+      avatarEl.innerText = player.gender === "female" ? "🛡️" : "⚔️";
+    }
+  }
   
   const floorHUD = document.getElementById("hud-floor");
   if (floorHUD) floorHUD.innerText = floor;
@@ -1384,6 +1439,17 @@ function update(deltaTime) {
   // Update HUD
   if (hudHp) hudHp.innerText = `${Math.ceil(player.hp)}/${player.maxHp}`;
   if (hudMana) hudMana.innerText = `${Math.ceil(player.mana)}/${player.maxMana}`;
+
+  const hudHpFill = document.getElementById("hud-hp-fill");
+  if (hudHpFill && player.maxHp > 0) {
+    let hpPct = (player.hp / player.maxHp) * 100;
+    hudHpFill.style.width = `${Math.min(100, Math.max(0, hpPct))}%`;
+  }
+  const hudManaFill = document.getElementById("hud-mana-fill");
+  if (hudManaFill && player.maxMana > 0) {
+    let manaPct = (player.mana / player.maxMana) * 100;
+    hudManaFill.style.width = `${Math.min(100, Math.max(0, manaPct))}%`;
+  }
   
   // Update Experience HUD
   const hudLevel = document.getElementById("hud-level");
@@ -1682,6 +1748,7 @@ if (closeInventoryBtn) {
     const modal = document.getElementById("inventory-modal");
     if (modal) {
       modal.classList.add("hidden");
+      if (canvas) canvas.focus();
     }
   });
 }
@@ -2500,6 +2567,7 @@ function closeShopModal() {
   const modal = document.getElementById("shop-modal");
   if (modal) {
     modal.classList.add("hidden");
+    if (canvas) canvas.focus();
   }
 }
 
@@ -2707,6 +2775,135 @@ if (btnInteract) {
     handleInteraction();
   });
 }
+
+// Fullscreen mode helpers and orientation lock
+function enterFullscreen() {
+  const docEl = document.documentElement;
+  try {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen();
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      } else if (docEl.mozRequestFullScreen) {
+        docEl.mozRequestFullScreen();
+      } else if (docEl.msRequestFullscreen) {
+        docEl.msRequestFullscreen();
+      }
+      
+      // Attempt locking orientation to landscape for mobile
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock("landscape").catch((err) => {
+          console.log("Orientation lock not supported or failed:", err);
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Could not enter fullscreen automatically:", err);
+  }
+}
+
+function toggleFullscreen() {
+  const docEl = document.documentElement;
+  if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+    if (docEl.requestFullscreen) {
+      docEl.requestFullscreen();
+    } else if (docEl.webkitRequestFullscreen) {
+      docEl.webkitRequestFullscreen();
+    } else if (docEl.mozRequestFullScreen) {
+      docEl.mozRequestFullScreen();
+    } else if (docEl.msRequestFullscreen) {
+      docEl.msRequestFullscreen();
+    }
+    
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock("landscape").catch((err) => {
+        console.log("Orientation lock failed/not supported:", err);
+      });
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+    }
+  }
+}
+
+function onFullscreenChange() {
+  const btn = document.getElementById("fullscreen-btn");
+  if (!btn) return;
+  const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+  if (isFS) {
+    btn.innerHTML = "⛶ Salir Fullscreen";
+    btn.classList.add("active");
+  } else {
+    btn.innerHTML = "⛶ Fullscreen";
+    btn.classList.remove("active");
+  }
+}
+
+// Bind orientation and fullscreen change events
+document.addEventListener("fullscreenchange", onFullscreenChange);
+document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+document.addEventListener("mozfullscreenchange", onFullscreenChange);
+document.addEventListener("MSFullscreenChange", onFullscreenChange);
+
+// Set up fullscreen button listener
+const fullscreenBtn = document.getElementById("fullscreen-btn");
+if (fullscreenBtn) {
+  fullscreenBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    toggleFullscreen();
+  });
+}
+
+// Set up collapsible HUD listener
+const hudToggleBtn = document.getElementById("hud-toggle-btn");
+const hudEl = document.getElementById("hud");
+const expHudEl = document.getElementById("exp-hud");
+const charToggleBtn = document.getElementById("character-toggle-btn");
+
+function toggleCharacterPanel() {
+  if (!hudEl) return;
+  hudEl.classList.toggle("collapsed");
+  if (expHudEl) {
+    expHudEl.classList.toggle("collapsed");
+  }
+  if (charToggleBtn) {
+    if (hudEl.classList.contains("collapsed")) {
+      charToggleBtn.classList.remove("active");
+    } else {
+      charToggleBtn.classList.add("active");
+    }
+  }
+}
+
+if (hudToggleBtn) {
+  hudToggleBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    toggleCharacterPanel();
+  });
+}
+
+if (charToggleBtn) {
+  charToggleBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    toggleCharacterPanel();
+    
+    // Also blur button so spacebar doesn't trigger it again
+    charToggleBtn.blur();
+    if (canvas) canvas.focus();
+  });
+}
+
+// Make sure global bindings are set up for inline event listeners
+window.enterFullscreen = enterFullscreen;
+window.toggleFullscreen = toggleFullscreen;
 
 // Initialize state classes on startup
 setGameState("MENU");

@@ -59,14 +59,28 @@
         
 
         <div id="game-ui" class="hidden">
+            <button type="button" id="character-toggle-btn" class="char-toggle-btn">Personaje</button>
             <div id="hud-container">
                 <div id="hud">
-                    <div class="hud-stat">❤️ <span id="hud-hp">100/100</span></div>
-                    <div class="hud-stat" style="color: #3498db;">🔵 <span id="hud-mana">100/100</span></div>
-                    <div class="hud-info"><span id="hud-name">Player</span> (<span id="hud-class">Warrior</span>)</div>
-                    <div class="hud-stat">Piso: <span id="hud-floor">1</span></div>
-                    <div class="hud-stat" style="color: #f1c40f;">🪙 <span id="hud-coins">0</span></div>
-                    <div class="hud-stat" style="margin-left: auto; font-size: 0.95rem;">
+                    <div class="hud-avatar" id="hud-avatar-icon">⚔️</div>
+                    <div class="hud-main-info">
+                        <div class="hud-info"><span id="hud-name">Player</span> (<span id="hud-class">Warrior</span>)</div>
+                        <div class="hud-bars">
+                            <div class="hud-bar-container hp-bar">
+                                <div id="hud-hp-fill" class="hud-bar-fill" style="width: 100%;"></div>
+                                <span class="hud-bar-text">❤️ <span id="hud-hp">100/100</span></span>
+                            </div>
+                            <div class="hud-bar-container mp-bar">
+                                <div id="hud-mana-fill" class="hud-bar-fill" style="width: 100%;"></div>
+                                <span class="hud-bar-text">🔵 <span id="hud-mana">100/100</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hud-stats-group">
+                        <div class="hud-stat">Piso: <span id="hud-floor">1</span></div>
+                        <div class="hud-stat" style="color: #f1c40f;">🪙 <span id="hud-coins">0</span></div>
+                    </div>
+                    <div class="hud-combat-status-container">
                         <span id="hud-combat-status" class="combat-status-out">🛡️ LIBRE</span>
                     </div>
                     <div class="hud-actions-column">
@@ -77,6 +91,10 @@
                             <div class="power-slot" id="slot-1"><span class="slot-key">2</span></div>
                             <div class="power-slot" id="slot-2"><span class="slot-key">3</span></div>
                         </div>
+                    </div>
+                    <div class="hud-tabs-container">
+                        <button type="button" id="hud-toggle-btn" class="hud-tab-btn" title="Ocultar/Mostrar HUD">▲ HUD</button>
+                        <button type="button" id="fullscreen-btn" class="hud-tab-btn" title="Pantalla Completa">⛶ Fullscreen</button>
                     </div>
                 </div>
                 <div id="exp-hud">
@@ -247,7 +265,7 @@
     </div>
 
     <!-- El canvas está separado del UI container para ocupar toda la pantalla por detrás -->
-    <canvas id="game-canvas" class="hidden"></canvas>
+    <canvas id="game-canvas" tabindex="0" class="hidden"></canvas>
 
     <script src="js/rarities.js"></script>
     <script src="js/stats.js"></script>

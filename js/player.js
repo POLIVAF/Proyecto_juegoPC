@@ -227,6 +227,33 @@ class Player {
     }
 
     update(keys, mouse, camera, dungeon, deltaTime) {
+        // Prevent Wall Sticking (Auto-unlock if stuck in a wall)
+        if (dungeon && dungeon.isWallRect) {
+            let insideWall = dungeon.isWallRect(this.x, this.y, this.width, this.height);
+            if (insideWall) {
+                console.warn("Player stuck in wall! Auto-unlocking...");
+                let foundSafe = false;
+                // Search in concentric squares (up to 3 tiles radius)
+                for (let r = 1; r <= 3 && !foundSafe; r++) {
+                    let directions = [
+                        {x: 0, y: -r}, {x: 0, y: r}, {x: -r, y: 0}, {x: r, y: 0},
+                        {x: -r, y: -r}, {x: r, y: -r}, {x: -r, y: r}, {x: r, y: r}
+                    ];
+                    for (let dir of directions) {
+                        let tx = this.x + dir.x * dungeon.tileSize;
+                        let ty = this.y + dir.y * dungeon.tileSize;
+                        if (!dungeon.isWallRect(tx, ty, this.width, this.height)) {
+                            this.x = tx;
+                            this.y = ty;
+                            foundSafe = true;
+                            console.log(`Resolved wall collision, moved player to (${tx}, ${ty})`);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         // Handle Status Effects
         if (this.poisonTimer > 0) {
             this.poisonTimer--;
@@ -281,10 +308,10 @@ class Player {
                 currentSpeed = this.speed; // run
             }
         } else {
-            if (keys['w'] || keys['ArrowUp']) dy -= 1;
-            if (keys['s'] || keys['ArrowDown']) dy += 1;
-            if (keys['a'] || keys['ArrowLeft']) dx -= 1;
-            if (keys['d'] || keys['ArrowRight']) dx += 1;
+            if (keys['w'] || keys['W'] || keys['KeyW'] || keys['ArrowUp']) dy -= 1;
+            if (keys['s'] || keys['S'] || keys['KeyS'] || keys['ArrowDown']) dy += 1;
+            if (keys['a'] || keys['A'] || keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
+            if (keys['d'] || keys['D'] || keys['KeyD'] || keys['ArrowRight']) dx += 1;
 
             // Normalize diagonal movement
             if (dx !== 0 && dy !== 0) {
