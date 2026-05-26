@@ -4,7 +4,7 @@ export default class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image('player', 'assets/player.png');
+    this.load.spritesheet('player', 'assets/sprites/player/player_walk.png', { frameWidth: 64, frameHeight: 64 });
   }
 
   create() {

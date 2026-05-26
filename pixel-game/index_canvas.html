@@ -12,8 +12,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Isekai">
     
-    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
-    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/ui/icon-192.png">
+    <link rel="apple-touch-icon" href="assets/ui/icon-192.png">
     <link rel="manifest" href="manifest.json">
     
     <link rel="stylesheet" href="style.css">
@@ -282,17 +282,17 @@
     <!-- El canvas está separado del UI container para ocupar toda la pantalla por detrás -->
     <canvas id="game-canvas" tabindex="0" class="hidden"></canvas>
 
-    <script src="js/rarities.js"></script>
-    <script src="js/stats.js"></script>
-    <script src="js/loot.js"></script>
-    <script src="js/drops.js"></script>
-    <script src="js/economy.js"></script>
-    <script src="js/dungeon.js"></script>
-    <script src="js/player.js"></script>
-    <script src="js/enemy.js"></script>
-    <script src="js/boss.js"></script>
-    <script src="js/Floor10Boss.js"></script>
-    <script src="js/Floor15Boss.js"></script>
+    <script src="js/systems/rarities.js"></script>
+    <script src="js/systems/stats.js"></script>
+    <script src="js/systems/loot.js"></script>
+    <script src="js/systems/drops.js"></script>
+    <script src="js/systems/economy.js"></script>
+    <script src="js/systems/dungeon.js"></script>
+    <script src="js/entities/player_canvas.js"></script>
+    <script src="js/entities/enemy.js"></script>
+    <script src="js/entities/boss.js"></script>
+    <script src="js/entities/Floor10Boss.js"></script>
+    <script src="js/entities/Floor15Boss.js"></script>
     <script src="js/game.js" defer></script>
     <script>
         if ('serviceWorker' in navigator) {
