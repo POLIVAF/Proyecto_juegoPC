@@ -898,6 +898,11 @@ button:active {
     right: 94px;
     background-color: rgba(211, 84, 0, 0.4); /* Tierra/Roca */
 }
+#btn-p4 {
+    bottom: 140px;
+    right: 5px;
+    background-color: rgba(142, 68, 173, 0.4); /* Púrpura */
+}
 
 #btn-attack {
     position: absolute;
@@ -1193,6 +1198,10 @@ html.menu-active, body.menu-active {
     #btn-p3 {
         bottom: 75px;
         right: 75px;
+    }
+    #btn-p4 {
+        bottom: 112px;
+        right: 0px;
     }
     #btn-interact {
         bottom: 0px;

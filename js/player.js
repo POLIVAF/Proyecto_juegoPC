@@ -31,7 +31,7 @@ class Player {
             this.baseMaxMana = 50;
             this.maxMana = 50;
             this.mana = 50;
-            this.speed = 3;
+            this.speed = 2.2;
             this.baseDamage = 25; // Store base before equipment
             this.damage = 25;
             this.color = this.gender === 'male' ? '#e74c3c' : '#c0392b'; // Reds
@@ -42,7 +42,7 @@ class Player {
             this.baseMaxMana = 150;
             this.maxMana = 150;
             this.mana = 150;
-            this.speed = 4;
+            this.speed = 2.6;
             this.baseDamage = 15;
             this.damage = 15;
             this.color = this.gender === 'male' ? '#3498db' : '#2980b9'; // Blues
@@ -119,6 +119,7 @@ class Player {
 
         this.exp += amount;
         let leveledUp = false;
+        let oldLevel = this.level;
 
         while (this.exp >= this.nextLevelExp) {
             this.exp -= this.nextLevelExp;
@@ -152,6 +153,21 @@ class Player {
             // Play synthesized level up chime
             if (typeof playLevelUpSound === 'function') {
                 playLevelUpSound();
+            }
+
+            // Check level milestones reached: 3, 7, 10, 12
+            let triggeredReward = false;
+            for (let lv = oldLevel + 1; lv <= this.level; lv++) {
+                if ([3, 7, 10, 12].includes(lv)) {
+                    triggeredReward = true;
+                }
+            }
+
+            if (triggeredReward && typeof showRewardScreen === 'function') {
+                window.isLevelUpReward = true;
+                setTimeout(() => {
+                    showRewardScreen();
+                }, 500);
             }
         }
         
@@ -282,14 +298,15 @@ class Player {
         let dy = 0;
         let currentSpeed = this.speed;
 
-        if (this.powers.length > 0) {
-            this.activePowerIndex = Math.min(this.activePowerIndex, this.powers.length - 1);
-        }
-
         // Switch active power
         if (keys['1']) this.activePowerIndex = 0;
         if (keys['2']) this.activePowerIndex = 1;
         if (keys['3']) this.activePowerIndex = 2;
+        if (keys['4']) this.activePowerIndex = 3;
+
+        if (this.powers.length > 0) {
+            this.activePowerIndex = Math.min(this.activePowerIndex, this.powers.length - 1);
+        }
 
         // Joystick controls if active
         if (window.touchJoystick && window.touchJoystick.active) {

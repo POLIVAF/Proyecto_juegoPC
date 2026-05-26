@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Isekai Tower</title>
+    
+    <!-- PWA & Mobile Optimization -->
+    <meta name="theme-color" content="#2c1a4d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Isekai">
+    
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -90,6 +102,7 @@
                             <div class="power-slot" id="slot-0"><span class="slot-key">1</span></div>
                             <div class="power-slot" id="slot-1"><span class="slot-key">2</span></div>
                             <div class="power-slot" id="slot-2"><span class="slot-key">3</span></div>
+                            <div class="power-slot" id="slot-3"><span class="slot-key">4</span></div>
                         </div>
                     </div>
                     <div class="hud-tabs-container">
@@ -209,6 +222,7 @@
                     <button type="button" onclick="replacePower(0)">Reemplazar Slot 1</button>
                     <button type="button" onclick="replacePower(1)">Reemplazar Slot 2</button>
                     <button type="button" onclick="replacePower(2)">Reemplazar Slot 3</button>
+                    <button type="button" onclick="replacePower(3)">Reemplazar Slot 4</button>
                 </div>
             </div>
         </div>
@@ -233,6 +247,7 @@
                     <button type="button" id="btn-p1" class="power-btn">1</button>
                     <button type="button" id="btn-p2" class="power-btn">2</button>
                     <button type="button" id="btn-p3" class="power-btn">3</button>
+                    <button type="button" id="btn-p4" class="power-btn">4</button>
                 </div>
                 <button type="button" id="btn-interact" class="hidden">💬</button>
                 <button type="button" id="btn-attack">⚔️</button>
@@ -279,5 +294,14 @@
     <script src="js/Floor10Boss.js"></script>
     <script src="js/Floor15Boss.js"></script>
     <script src="js/game.js" defer></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((reg) => console.log('Service Worker registered successfully!', reg.scope))
+                    .catch((err) => console.error('Service Worker registration failed:', err));
+            });
+        }
+    </script>
 </body>
 </html>

@@ -177,17 +177,98 @@ class Enemy {
         let newX = this.x + this.dirX * currentSpeed;
         let newY = this.y + this.dirY * currentSpeed;
 
-        // Wall collision logic using Bounding Box
-        if (!dungeon.isWallRect(newX, this.y, this.width, this.height)) {
-            this.x = newX;
+        if (this.isChasing) {
+            let wallX = dungeon.isWallRect(newX, this.y, this.width, this.height);
+            let wallY = dungeon.isWallRect(this.x, newY, this.width, this.height);
+            
+            if (wallX || wallY) {
+                let angles = [Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2];
+                let currentAngle = Math.atan2(this.dirY, this.dirX);
+                for (let angleOffset of angles) {
+                    let testAngle = currentAngle + angleOffset;
+                    let testDirX = Math.cos(testAngle);
+                    let testDirY = Math.sin(testAngle);
+                    let testX = this.x + testDirX * currentSpeed;
+                    let testY = this.y + testDirY * currentSpeed;
+                    if (!dungeon.isWallRect(testX, testY, this.width, this.height)) {
+                        this.dirX = testDirX;
+                        this.dirY = testDirY;
+                        newX = testX;
+                        newY = testY;
+                        break;
+                    }
+                }
+            }
+            
+            if (!dungeon.isWallRect(newX, this.y, this.width, this.height)) {
+                this.x = newX;
+            }
+            if (!dungeon.isWallRect(this.x, newY, this.width, this.height)) {
+                this.y = newY;
+            }
         } else {
-            this.dirX *= -1; // Bounce
+            // Wander: normal bounce movement
+            if (!dungeon.isWallRect(newX, this.y, this.width, this.height)) {
+                this.x = newX;
+            } else {
+                this.dirX *= -1;
+            }
+            if (!dungeon.isWallRect(this.x, newY, this.width, this.height)) {
+                this.y = newY;
+            } else {
+                this.dirY *= -1;
+            }
         }
 
-        if (!dungeon.isWallRect(this.x, newY, this.width, this.height)) {
-            this.y = newY;
-        } else {
-            this.dirY *= -1; // Bounce
+        // Physical collision resolution with player
+        let pDx = this.x - player.x;
+        let pDy = this.y - player.y;
+        let pDist = Math.sqrt(pDx * pDx + pDy * pDy);
+        let pMinDist = player.width / 2 + this.width / 2;
+        if (pDist < pMinDist) {
+            if (pDist === 0) {
+                pDx = Math.random() - 0.5;
+                pDy = Math.random() - 0.5;
+                pDist = Math.sqrt(pDx * pDx + pDy * pDy);
+            }
+            let overlap = pMinDist - pDist;
+            let pushX = (pDx / pDist) * overlap;
+            let pushY = (pDy / pDist) * overlap;
+            if (!dungeon.isWallRect(this.x + pushX, this.y + pushY, this.width, this.height)) {
+                this.x += pushX;
+                this.y += pushY;
+            } else {
+                if (!dungeon.isWallRect(this.x + pushX, this.y, this.width, this.height)) this.x += pushX;
+                else if (!dungeon.isWallRect(this.x, this.y + pushY, this.width, this.height)) this.y += pushY;
+            }
+        }
+
+        // Physical collision resolution with other enemies
+        if (typeof enemies !== 'undefined') {
+            for (let other of enemies) {
+                if (other === this || other.hp <= 0) continue;
+                let edx = this.x - other.x;
+                let edy = this.y - other.y;
+                let edist = Math.sqrt(edx * edx + edy * edy);
+                let eminDist = this.width / 2 + other.width / 2;
+                if (edist < eminDist) {
+                    if (edist === 0) {
+                        edx = Math.random() - 0.5;
+                        edy = Math.random() - 0.5;
+                        edist = Math.sqrt(edx * edx + edy * edy);
+                    }
+                    let eoverlap = eminDist - edist;
+                    let epushX = (edx / edist) * eoverlap * 0.5;
+                    let epushY = (edy / edist) * eoverlap * 0.5;
+                    if (!dungeon.isWallRect(this.x + epushX, this.y + epushY, this.width, this.height)) {
+                        this.x += epushX;
+                        this.y += epushY;
+                    } else {
+                        if (!dungeon.isWallRect(this.x + epushX, this.y, this.width, this.height)) this.x += epushX;
+                        else if (!dungeon.isWallRect(this.x, this.y + epushY, this.width, this.height)) this.y += epushY;
+                    }
+                }
+            }
         }
     }
 

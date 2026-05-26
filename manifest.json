@@ -1,0 +1,24 @@
+{
+  "name": "Isekay Tower",
+  "short_name": "Isekay",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1a1a1a",
+  "theme_color": "#2c1a4d",
+  "description": "Un RPG de torre y acción con controles optimizados para móvil y escritorio.",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -13,7 +13,7 @@ function getShopItems() {
   
   weaponCommon.price = 30 + (scaleFloor - 1) * 10;
   weaponRare.price = 75 + (scaleFloor - 1) * 20;
-  weaponLegendary.price = 150 + (scaleFloor - 1) * 45;
+  weaponLegendary.price = 3000000;
 
   // Procedural Shop Armor & Accessories
   let shopArmor = generateRandomEquipment(scaleFloor, "rare");
@@ -22,7 +22,7 @@ function getShopItems() {
   let shopAccessory = generateRandomAccessory(Math.random() < 0.5 ? "ring" : "pendant", scaleFloor, "rare");
   shopAccessory.price = 45 + (scaleFloor - 1) * 10;
 
-  return [
+  let items = [
     {
       type: "red_potion",
       name: "Poción Roja",
@@ -72,6 +72,19 @@ function getShopItems() {
       color: "#e74c3c"
     }
   ];
+
+  if (!window.purchasedUpgradeStoneOnThisFloor) {
+    items.push({
+      type: "power_upgrade_stone",
+      name: "Piedra de Mejora",
+      desc: "Sube cualquier poder +1 nivel",
+      price: 1000000,
+      icon: "💎",
+      color: "#9b59b6"
+    });
+  }
+
+  return items;
 }
 
 function getItemSellValue(item) {
@@ -81,11 +94,12 @@ function getItemSellValue(item) {
 
   // Base sell value based on rarity
   let rarity = item.rarity || "common";
+  if (rarity === "legendary") return 1500000;
+
   let baseVal = 5;
   if (rarity === "rare") baseVal = 15;
   else if (rarity === "very_rare") baseVal = 30;
   else if (rarity === "epic") baseVal = 50;
-  else if (rarity === "legendary") baseVal = 100;
 
   // Add floor scaling
   let finalVal = baseVal + scaleFloor * Math.floor(baseVal * 0.1);

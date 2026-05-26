@@ -33,11 +33,10 @@ function rollMobDrop(floor, x, y, playerClass) {
     let randPool = Math.random();
     let typeSelected;
     
-    if (randPool < 0.20) typeSelected = "weapon";
-    else if (randPool < 0.45) typeSelected = "armor";
-    else if (randPool < 0.65) typeSelected = "ring";
-    else if (randPool < 0.85) typeSelected = "pendant";
-    else typeSelected = "potion";
+    if (randPool < 0.25) typeSelected = "weapon";
+    else if (randPool < 0.55) typeSelected = "armor";
+    else if (randPool < 0.78) typeSelected = "ring";
+    else typeSelected = "pendant";
 
     if (typeSelected === "weapon") {
       let item = generateClassWeapon(rarity, floor, playerClass);
@@ -103,38 +102,41 @@ function rollMobDrop(floor, x, y, playerClass) {
         stats: item.stats
       });
     } else if (typeSelected === "potion") {
-      let healAmount = 15 + (floor - 1) * 2;
-      let manaAmount = 15 + (floor - 1) * 2;
-      if (Math.random() < 0.5) {
-        drops.push({
-          x: x,
-          y: y,
-          radius: 6,
-          type: "red_potion",
-          color: "#e74c3c",
-          name: "Poción Roja +" + floor,
-          healAmount: healAmount,
-          icon: "🔴",
-          desc: "Restaura " + healAmount + " HP"
-        });
-      } else {
-        drops.push({
-          x: x,
-          y: y,
-          radius: 6,
-          type: "blue_potion",
-          color: "#3498db",
-          name: "Poción Azul +" + floor,
-          manaAmount: manaAmount,
-          icon: "🔵",
-          desc: "Restaura " + manaAmount + " Mana"
-        });
-      }
+      drops.push(rollPotionDrop(floor, x, y));
     }
   }
 
   return drops;
 }
+
+function rollPotionDrop(floor, x, y) {
+  let healAmount = 15 + (floor - 1) * 2;
+  let manaAmount = 15 + (floor - 1) * 2;
+  if (Math.random() < 0.5) {
+    return {
+      x: x,
+      y: y,
+      radius: 6,
+      type: "red_potion",
+      color: "#e74c3c",
+      name: "Poción Roja +" + floor,
+      healAmount: healAmount,
+      icon: "🔴",
+      desc: "Restaura " + healAmount + " HP"
+    };
+  } else {
+    return {
+      x: x,
+      y: y,
+      radius: 6,
+      type: "blue_potion",
+      color: "#3498db",
+      name: "Poción Azul +" + floor,
+      manaAmount: manaAmount,
+      icon: "🔵",
+      desc: "Restaura " + manaAmount + " Mana"
+    };
+  }
 
 function rollBossDrop(floor, x, y, playerClass) {
   let drops = [];
@@ -353,35 +355,7 @@ function rollChestDrop(floor, x, y, playerClass) {
   if (Math.random() < consumableChance) {
     let ox = x + (Math.random() - 0.5) * 30;
     let oy = y + (Math.random() - 0.5) * 30;
-    
-    // Potions heal more on higher floors
-    let healAmount = 15 + (floor - 1) * 2;
-    let manaAmount = 15 + (floor - 1) * 2;
-    if (Math.random() < 0.5) {
-      drops.push({
-        x: ox,
-        y: oy,
-        radius: 6,
-        type: "red_potion",
-        color: "#e74c3c",
-        name: "Poción Roja +" + floor,
-        healAmount: healAmount,
-        icon: "🔴",
-        desc: "Restaura " + healAmount + " HP"
-      });
-    } else {
-      drops.push({
-        x: ox,
-        y: oy,
-        radius: 6,
-        type: "blue_potion",
-        color: "#3498db",
-        name: "Poción Azul +" + floor,
-        manaAmount: manaAmount,
-        icon: "🔵",
-        desc: "Restaura " + manaAmount + " Mana"
-      });
-    }
+    drops.push(rollPotionDrop(floor, ox, oy));
   }
 
   return drops;
