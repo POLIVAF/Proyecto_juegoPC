@@ -298,8 +298,6 @@ function hideTooltip() {
   if (tooltip) {
     tooltip.classList.add("hidden");
   }
-  window.activeTooltipSlotIndex = null;
-  window.activeTooltipSlotType = null;
 }
 
 // Drag & Drop Handlers
@@ -378,26 +376,25 @@ function handleDrop(e, targetType, targetValue) {
     }
     
     if (targetType === "drop_zone") {
-      let item = null;
       if (srcType === "backpack") {
-        item = player.inventory[parseInt(srcVal)];
-      } else if (srcType === "equipped") {
-        item = player.equipment[srcVal];
-      }
-      if (!item) return;
-      
-      let confirmDestruction = confirm(`¿Estás seguro de destruir este objeto? (${item.name})`);
-      if (confirmDestruction) {
-        if (srcType === "backpack") {
-          player.inventory.splice(parseInt(srcVal), 1);
-        } else if (srcType === "equipped") {
-          player.equipment[srcVal] = null;
-          player.damage = player.getDamage();
-        }
-        addFloatingText("Destruido: " + item.name, player.x, player.y - 20, "#e74c3c");
+        let itemIndex = parseInt(srcVal);
+        let item = player.inventory[itemIndex];
+        if (!item) return;
+        player.inventory.splice(itemIndex, 1);
+        spawnDroppedItem(item);
+        addFloatingText("Soltado: " + item.name, player.x, player.y - 20, item.color || "#fff");
         updateInventoryUI();
         saveGame();
-        hideTooltip();
+      } else if (srcType === "equipped") {
+        let slot = srcVal;
+        let item = player.equipment[slot];
+        if (!item) return;
+        player.equipment[slot] = null;
+        spawnDroppedItem(item);
+        player.damage = player.getDamage();
+        addFloatingText("Soltado: " + item.name, player.x, player.y - 20, item.color || "#fff");
+        updateInventoryUI();
+        saveGame();
       }
       return;
     }
@@ -553,7 +550,6 @@ window.addEventListener("keydown", (e) => {
     const inventoryModal = document.getElementById("inventory-modal");
     if (inventoryModal) {
       inventoryModal.classList.add("hidden");
-      hideTooltip();
       if (canvas) canvas.focus();
     }
   }
@@ -566,7 +562,6 @@ window.addEventListener("keydown", (e) => {
         updateInventoryUI(); // Refresh items on open
       } else {
         inventoryModal.classList.add("hidden");
-        hideTooltip();
         if (canvas) canvas.focus();
       }
     }
@@ -691,7 +686,7 @@ function resetPlayerOnDeath(player) {
     player.baseMaxMana = 50;
     player.maxMana = 50;
     player.baseDamage = 25;
-    player.speed = 2.2;
+    player.speed = 3;
   } else {
     // Mage
     player.baseMaxHp = 80;
@@ -699,7 +694,7 @@ function resetPlayerOnDeath(player) {
     player.baseMaxMana = 150;
     player.maxMana = 150;
     player.baseDamage = 15;
-    player.speed = 2.6;
+    player.speed = 4;
   }
 
   player.hp = player.maxHp;
@@ -1012,7 +1007,6 @@ function initLevel(name, charClass, gender, newPlayer) {
   
   merchantKeyObtained = false;
   hasMerchantKey = false;
-  window.purchasedUpgradeStoneOnThisFloor = false;
 
   let isBossFloor = floor % 5 === 0;
   if (isBossFloor) {
@@ -1297,7 +1291,6 @@ function update(deltaTime) {
           player.hp -= finalDmg;
           addFloatingText("-" + Math.round(finalDmg), player.x, player.y - 10, "#e74c3c");
           player.flashTimer = 10;
-          player.immunityTimer = 20; // 20 frames of invulnerability on hit
 
           // Apply Status
           if (e.type === "poison") {
@@ -1308,7 +1301,7 @@ function update(deltaTime) {
             }
           }
 
-          e.attackCooldown = 90; // 90 frames cooldown between attacks
+          e.attackCooldown = 60; // 1 second cooldown between hits
 
           if (player.hp <= 0) gameOver();
         } else if (e instanceof Boss && player.immunityTimer <= 0) {
@@ -1367,9 +1360,6 @@ function update(deltaTime) {
         rolledDrops = rollBossDrop(floor, e.x, e.y, player.charClass);
       } else {
         rolledDrops = rollMobDrop(floor, e.x, e.y, player.charClass);
-        if (Math.random() < 0.33) {
-          rolledDrops.push(rollPotionDrop(floor, e.x, e.y));
-        }
       }
       rolledDrops.forEach(drop => droppedItems.push(drop));
       enemies.splice(i, 1);
@@ -1758,7 +1748,6 @@ if (closeInventoryBtn) {
     const modal = document.getElementById("inventory-modal");
     if (modal) {
       modal.classList.add("hidden");
-      hideTooltip();
       if (canvas) canvas.focus();
     }
   });
@@ -1799,13 +1788,13 @@ function updateInventoryUI() {
         }
         slot.innerHTML = icon;
 
-        // Custom Tooltips mouse/touch events disabled for hover, enabled for click-toggle
-        slot.onmouseenter = null;
-        slot.onmousemove = null;
-        slot.onmouseleave = null;
-        slot.ontouchstart = null;
-        slot.ontouchend = null;
-        slot.ontouchcancel = null;
+        // Custom Tooltips mouse/touch events
+        slot.onmouseenter = (e) => showTooltip(item, e);
+        slot.onmousemove = positionTooltip;
+        slot.onmouseleave = hideTooltip;
+        slot.ontouchstart = (e) => { showTooltip(item, e); };
+        slot.ontouchend = hideTooltip;
+        slot.ontouchcancel = hideTooltip;
 
         // Drag and drop source events
         slot.draggable = true;
@@ -1815,17 +1804,8 @@ function updateInventoryUI() {
         slot.onclick = (e) => {
           if (e && e.shiftKey) {
             dropItem(i);
-            hideTooltip();
           } else {
-            const tooltip = document.getElementById("item-tooltip");
-            if (tooltip.classList.contains("hidden") || window.activeTooltipSlotIndex !== i || window.activeTooltipSlotType !== "backpack") {
-              window.activeTooltipSlotIndex = i;
-              window.activeTooltipSlotType = "backpack";
-              showTooltip(item, e);
-            } else {
-              useItem(i);
-              hideTooltip();
-            }
+            useItem(i);
           }
         };
       } else {
@@ -1879,31 +1859,18 @@ function updateInventoryUI() {
         }
         el.className = `inv-slot eq-slot equipped rarity-${rarityKey}` + (slot === "weapon" ? " weapon-slot" : "");
 
-        // Custom Tooltips mouse/touch events disabled for hover, enabled for click-toggle
-        el.onmouseenter = null;
-        el.onmousemove = null;
-        el.onmouseleave = null;
-        el.ontouchstart = null;
-        el.ontouchend = null;
-        el.ontouchcancel = null;
+        // Custom Tooltips mouse/touch events
+        el.onmouseenter = (e) => showTooltip(eqItem, e);
+        el.onmousemove = positionTooltip;
+        el.onmouseleave = hideTooltip;
+        el.ontouchstart = (e) => { showTooltip(eqItem, e); };
+        el.ontouchend = hideTooltip;
+        el.ontouchcancel = hideTooltip;
 
         // Drag and drop source events
         el.draggable = true;
         el.ondragstart = (e) => handleDragStart(e, "equipped", slot);
         el.ondragend = handleDragEnd;
-
-        el.onclick = (e) => {
-          e.preventDefault();
-          const tooltip = document.getElementById("item-tooltip");
-          if (tooltip.classList.contains("hidden") || window.activeTooltipSlotIndex !== slot || window.activeTooltipSlotType !== "equipped") {
-            window.activeTooltipSlotIndex = slot;
-            window.activeTooltipSlotType = "equipped";
-            showTooltip(eqItem, e);
-          } else {
-            unequipItem(slot);
-            hideTooltip();
-          }
-        };
       } else {
         el.style.backgroundColor = "";
         el.style.borderColor = "";
@@ -2081,24 +2048,6 @@ function useItem(index) {
       }
       break;
 
-    case "power_upgrade_stone":
-      if (player.powers.length > 0) {
-        let activePower = player.powers[player.activePowerIndex];
-        if (activePower) {
-          activePower.level = (activePower.level || 1) + 1;
-          addFloatingText(`${activePower.name} Nivel +1 ✨`, player.x, player.y - 20, "#9b59b6");
-          console.log(`Poder mejorado: ${activePower.name} ahora es Nivel ${activePower.level}`);
-        } else {
-          console.log("No hay un poder seleccionado válido.");
-          canUse = false;
-        }
-      } else {
-        addFloatingText("¡Sin poderes que mejorar!", player.x, player.y - 20, "#e74c3c");
-        console.log("No tienes poderes desbloqueados para mejorar.");
-        canUse = false;
-      }
-      break;
-
     default:
       console.log("Este objeto no tiene un uso definido.");
       canUse = false;
@@ -2109,7 +2058,6 @@ function useItem(index) {
     player.inventory.splice(index, 1);
     updateInventoryUI(); 
     saveGame();
-    hideTooltip();
   }
 }
 
@@ -2182,14 +2130,12 @@ function dropItem(index) {
   if (!player || index < 0 || index >= player.inventory.length) return;
   let item = player.inventory[index];
   
-  let confirmDestruction = confirm(`¿Estás seguro de destruir este objeto? (${item.name})`);
-  if (confirmDestruction) {
-    player.inventory.splice(index, 1);
-    addFloatingText("Destruido: " + item.name, player.x, player.y - 20, "#e74c3c");
-    updateInventoryUI();
-    saveGame();
-    hideTooltip();
-  }
+  player.inventory.splice(index, 1);
+  spawnDroppedItem(item);
+  
+  addFloatingText("Soltado: " + item.name, player.x, player.y - 20, item.color || "#fff");
+  updateInventoryUI();
+  saveGame();
 }
 window.dropItem = dropItem;
 
@@ -2198,7 +2144,7 @@ function updatePowerBarUI() {
   if (!hudPowerBar) return;
   hudPowerBar.innerHTML = "";
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 3; i++) {
     let slot = document.createElement("div");
     slot.className = "power-slot" + (i === player.activePowerIndex ? " active" : "");
 
@@ -2321,7 +2267,7 @@ function selectPower(power) {
   if (existingPowerIndex !== -1) {
     player.powers[existingPowerIndex].level = (player.powers[existingPowerIndex].level || 1) + 1;
     finishReward();
-  } else if (player.powers.length < 4) {
+  } else if (player.powers.length < 3) {
     power.level = 1;
     player.powers.push({...power});
     player.activePowerIndex = player.powers.length - 1;
@@ -2361,22 +2307,13 @@ function finishReward() {
       ? "Elige una nueva habilidad de combate:" 
       : "Elige un nuevo poder elemental:";
   }
-  
-  if (window.isLevelUpReward) {
-    window.isLevelUpReward = false;
-    saveGame();
-    setGameState("PLAYING");
-    updateMobileControlsVisibility();
-    startGameLoop();
-  } else {
-    floor++;
-    maxFloor = Math.max(maxFloor, floor);
-    initLevel(player.name, player.charClass, player.gender, false);
-    saveGame();
-    setGameState("PLAYING");
-    updateMobileControlsVisibility();
-    startGameLoop();
-  }
+  floor++;
+  maxFloor = Math.max(maxFloor, floor);
+  initLevel(player.name, player.charClass, player.gender, false);
+  saveGame();
+  setGameState("PLAYING");
+  updateMobileControlsVisibility();
+  startGameLoop();
 }
 
 // Initial Saved Game Check
@@ -2412,14 +2349,25 @@ if (joystickZone && joystickBase && joystickKnob) {
     window.touchJoystick.active = true;
     window.touchJoystick.identifier = t.identifier;
 
-    // Position joystick base dynamically under finger (floating joystick)
-    joystickBase.style.left = (t.clientX - 60) + "px";
-    joystickBase.style.top = (t.clientY - 60) + "px";
-    joystickBase.style.bottom = "auto";
+    // Get Fixed Base Center
+    const rect = joystickBase.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
 
-    joystickKnob.style.transform = "translate(-50%, -50%)";
-    window.touchJoystick.dx = 0;
-    window.touchJoystick.dy = 0;
+    let offsetX = t.clientX - centerX;
+    let offsetY = t.clientY - centerY;
+
+    const maxRadius = rect.width / 2 || 50;
+    const dist = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
+
+    if (dist > maxRadius) {
+      offsetX = (offsetX / dist) * maxRadius;
+      offsetY = (offsetY / dist) * maxRadius;
+    }
+
+    joystickKnob.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`;
+    window.touchJoystick.dx = offsetX / maxRadius;
+    window.touchJoystick.dy = offsetY / maxRadius;
   });
 
   window.addEventListener("touchmove", (e) => {
@@ -2463,11 +2411,6 @@ if (joystickZone && joystickBase && joystickKnob) {
         window.touchJoystick.dy = 0;
 
         joystickKnob.style.transform = "translate(-50%, -50%)";
-        
-        // Revert base position to default CSS stylesheet values
-        joystickBase.style.left = "";
-        joystickBase.style.top = "";
-        joystickBase.style.bottom = "";
         break;
       }
     }
@@ -2503,8 +2446,7 @@ if (btnAttack) {
 const powersMap = {
   'btn-p1': '1',
   'btn-p2': '2',
-  'btn-p3': '3',
-  'btn-p4': '4'
+  'btn-p3': '3'
 };
 for (let id in powersMap) {
   const btn = document.getElementById(id);
@@ -2586,12 +2528,16 @@ function handleInteraction() {
 }
 
 function advanceFloor() {
-  floor++;
-  maxFloor = Math.max(maxFloor, floor);
-  initLevel(player.name, player.charClass, player.gender, false);
-  saveGame();
-  addFloatingText(`Piso ${floor}`, player.x, player.y - 20, "#2ecc71");
-  console.log(`¡Avanzando al Piso ${floor}!`);
+  if (floor + 1 <= maxFloor) {
+    floor++;
+    initLevel(player.name, player.charClass, player.gender, false);
+    saveGame();
+    addFloatingText(`Piso ${floor}`, player.x, player.y - 20, "#2ecc71");
+    console.log(`¡Avanzando al Piso ${floor} (Bypass de Recompensa)!`);
+  } else {
+    saveGame();
+    showRewardScreen();
+  }
 }
 
 function openGoldChest(chest) {
@@ -2751,9 +2697,6 @@ function buyShopItem(index) {
   const hudCoins = document.getElementById("hud-coins");
   if (hudCoins) hudCoins.innerText = player.coins;
   
-  if (item.type === "power_upgrade_stone") {
-    window.purchasedUpgradeStoneOnThisFloor = true;
-  }
   console.log("Compraste: " + item.name);
   updateShopUI();
   updateInventoryUI();

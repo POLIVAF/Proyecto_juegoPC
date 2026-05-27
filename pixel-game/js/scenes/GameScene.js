@@ -1,37 +1,25 @@
+import Player from '../entities/Player.js';
+
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
   }
 
   create() {
-    this.player = this.physics.add.sprite(400, 300, 'player');
-
-    this.player.setScale(2);
-    this.player.setCollideWorldBounds(true);
+    this.player = new Player(this, 400, 300);
 
     this.cursors = this.input.keyboard.addKeys({
-  up: 'W',
-  down: 'S',
-  left: 'A',
-  right: 'D'
-});
+      up: 'W',
+      down: 'S',
+      left: 'A',
+      right: 'D'
+    });
+
+    // Make the camera follow the player
+    this.cameras.main.startFollow(this.player);
   }
 
   update() {
-    this.player.setVelocity(0);
-
-    if (this.cursors.left.isDown) {
-      this.player.setVelocityX(-150);
-    } 
-    else if (this.cursors.right.isDown) {
-      this.player.setVelocityX(150);
-    }
-
-    if (this.cursors.up.isDown) {
-      this.player.setVelocityY(-150);
-    } 
-    else if (this.cursors.down.isDown) {
-      this.player.setVelocityY(150);
-    }
+    this.player.update(this.cursors);
   }
 }

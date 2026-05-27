@@ -1,13 +1,307 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Mi juego</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Isekai Tower</title>
+    
+    <!-- PWA & Mobile Optimization -->
+    <meta name="theme-color" content="#2c1a4d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Isekai">
+    
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/ui/icon-192.png">
+    <link rel="apple-touch-icon" href="assets/ui/icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="ui-container">
+        <div id="main-menu">
+            <h1>Isekai Tower</h1>
+            <h2>Creación de Personaje</h2>
+            <form id="character-form">
+                <div class="form-group">
+                    <label for="char-name">Nombre:</label>
+                    <input type="text" id="char-name" required placeholder="Ingresa tu nombre..." maxlength="20">
+                </div>
+                
+                <div class="form-group">
+                    <label>Clase:</label>
+                    <div class="options">
+                        <label class="option-card">
+                            <input type="radio" name="char-class" value="warrior" checked>
+                            <span class="card-content">
+                                <strong>Guerrero</strong>
+                            </span>
+                        </label>
+                        <label class="option-card">
+                            <input type="radio" name="char-class" value="mage">
+                            <span class="card-content">
+                                <strong>Mago</strong>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Género:</label>
+                    <div class="options">
+                        <label class="option-card">
+                            <input type="radio" name="char-gender" value="male" checked>
+                            <span class="card-content">
+                                <strong>Hombre</strong>
+                            </span>
+                        </label>
+                        <label class="option-card">
+                            <input type="radio" name="char-gender" value="female">
+                            <span class="card-content">
+                                <strong>Mujer</strong>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+                <button type="button" id="continue-btn" class="hidden" style="background-color: #27ae60; margin-bottom: 10px;">Continuar Partida</button>
+                <button type="submit" id="start-btn">Nueva Aventura</button>
+            </form>
+        </div>
 
-<script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
-<script type="module" src="main.js"></script>
+        
 
+        <div id="game-ui" class="hidden">
+            <button type="button" id="character-toggle-btn" class="char-toggle-btn">Personaje</button>
+            <div id="hud-container">
+                <div id="hud">
+                    <div class="hud-avatar" id="hud-avatar-icon">⚔️</div>
+                    <div class="hud-main-info">
+                        <div class="hud-info"><span id="hud-name">Player</span> (<span id="hud-class">Warrior</span>)</div>
+                        <div class="hud-bars">
+                            <div class="hud-bar-container hp-bar">
+                                <div id="hud-hp-fill" class="hud-bar-fill" style="width: 100%;"></div>
+                                <span class="hud-bar-text">❤️ <span id="hud-hp">100/100</span></span>
+                            </div>
+                            <div class="hud-bar-container mp-bar">
+                                <div id="hud-mana-fill" class="hud-bar-fill" style="width: 100%;"></div>
+                                <span class="hud-bar-text">🔵 <span id="hud-mana">100/100</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hud-stats-group">
+                        <div class="hud-stat">Piso: <span id="hud-floor">1</span></div>
+                        <div class="hud-stat" style="color: #f1c40f;">🪙 <span id="hud-coins">0</span></div>
+                    </div>
+                    <div class="hud-combat-status-container">
+                        <span id="hud-combat-status" class="combat-status-out">🛡️ LIBRE</span>
+                    </div>
+                    <div class="hud-actions-column">
+                        <button type="button" id="backpack-btn" style="padding: 5px; background: #8e44ad;">🎒 Mochila</button>
+                        <!-- Power Bar -->
+                        <div id="power-bar">
+                            <div class="power-slot" id="slot-0"><span class="slot-key">1</span></div>
+                            <div class="power-slot" id="slot-1"><span class="slot-key">2</span></div>
+                            <div class="power-slot" id="slot-2"><span class="slot-key">3</span></div>
+                            <div class="power-slot" id="slot-3"><span class="slot-key">4</span></div>
+                        </div>
+                    </div>
+                    <div class="hud-tabs-container">
+                        <button type="button" id="hud-toggle-btn" class="hud-tab-btn" title="Ocultar/Mostrar HUD">▲ HUD</button>
+                        <button type="button" id="fullscreen-btn" class="hud-tab-btn" title="Pantalla Completa">⛶ Fullscreen</button>
+                    </div>
+                </div>
+                <div id="exp-hud">
+                    <div id="exp-label">Nivel <span id="hud-level">1</span></div>
+                    <div class="exp-bar-container">
+                        <div id="exp-bar-fill" style="width: 0%;"></div>
+                        <span id="exp-values">0 / 300 EXP</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="inventory-modal" class="hidden">
+            <div class="inventory-content">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>🎒 Mochila</h2>
+                    <button type="button" id="close-inventory" style="background: #e74c3c; padding: 5px 10px;">X</button>
+                </div>
+                
+                <div style="display: flex; gap: 20px; margin-top: 15px;">
+                    <!-- Backpack Slots -->
+                    <div style="flex: 2; display: flex; flex-direction: column; gap: 10px;">
+                        <h3>Objetos (15 Slots)</h3>
+                        <div id="backpack-grid" class="grid-container">
+                            <!-- 15 slots generated by JS -->
+                        </div>
+                        <div id="inv-drop-zone">
+                            <span>🗑️ Arrastra aquí para soltar (Shift+Click)</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Equipment Section -->
+                    <div style="flex: 1.2; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 20px;">
+                        <h3 style="margin-bottom: 10px;">🛡️ Equipamiento</h3>
+                        
+                        <div class="equip-category">
+                            <span class="equip-cat-title">Armadura</span>
+                            <div class="equip-grid-row">
+                                <div class="inv-slot eq-slot" id="eq-head" data-slot="head" title="Cabeza (Casco)" onclick="unequipItem('head')">🪖</div>
+                                <div class="inv-slot eq-slot" id="eq-chest" data-slot="chest" title="Pecho (Peto)" onclick="unequipItem('chest')">👕</div>
+                                <div class="inv-slot eq-slot" id="eq-legs" data-slot="legs" title="Piernas (Grebas)" onclick="unequipItem('legs')">👖</div>
+                                <div class="inv-slot eq-slot" id="eq-gloves" data-slot="gloves" title="Guantes" onclick="unequipItem('gloves')">🧤</div>
+                            </div>
+                        </div>
+                        
+                        <div class="equip-category" style="margin-top: 15px;">
+                            <span class="equip-cat-title">Accesorios</span>
+                            <div class="equip-grid-row" style="display: flex; gap: 10px;">
+                                <div class="inv-slot eq-slot" id="eq-ring" data-slot="ring" title="Anillo 1" onclick="unequipItem('ring')">💍</div>
+                                <div class="inv-slot eq-slot" id="eq-ring2" data-slot="ring2" title="Anillo 2" onclick="unequipItem('ring2')">💍</div>
+                                <div class="inv-slot eq-slot" id="eq-pendant" data-slot="pendant" title="Colgante 1" onclick="unequipItem('pendant')">📿</div>
+                                <div class="inv-slot eq-slot" id="eq-pendant2" data-slot="pendant2" title="Colgante 2" onclick="unequipItem('pendant2')">📿</div>
+                            </div>
+                        </div>
+                        
+                        <div class="equip-category" style="margin-top: 15px;">
+                            <span class="equip-cat-title">Arma Principal</span>
+                            <div class="equip-grid-row">
+                                <div class="inv-slot eq-slot weapon-slot" id="eq-weapon" data-slot="weapon" title="Arma Principal" onclick="unequipItem('weapon')" style="width: 100%; height: 50px; background: rgba(231, 76, 60, 0.1); border-color: rgba(231, 76, 60, 0.3);">⚔️</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+
+        <!-- Shop Modal -->
+        <div id="shop-modal" class="hidden">
+            <div class="shop-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1c40f; padding-bottom: 10px;">
+                    <h2 style="margin: 0; color: #f1c40f;">🛒 Tienda del Comerciante</h2>
+                    <button type="button" id="close-shop" style="background: #e74c3c; padding: 5px 12px; width: auto; margin: 0; font-size: 1rem; border-radius: 4px;">X</button>
+                </div>
+                
+                <div class="shop-gold-container">
+                    <span>Tus Monedas: <span style="color: #f1c40f;">🪙 <strong id="shop-player-coins">0</strong></span></span>
+                </div>
+                
+                <div class="shop-tabs">
+                    <button type="button" id="tab-buy" class="tab-btn active">Comprar</button>
+                    <button type="button" id="tab-sell" class="tab-btn">Vender</button>
+                </div>
+                
+                <!-- COMPRAR PANEL -->
+                <div id="buy-panel" class="shop-panel">
+                    <h3 style="margin-bottom: 10px; color: #fff; font-size: 1.1rem;">Objetos Disponibles</h3>
+                    <div id="shop-buy-list" class="shop-list">
+                        <!-- Lista generada por JS -->
+                    </div>
+                </div>
+                
+                <!-- VENDER PANEL -->
+                <div id="sell-panel" class="shop-panel hidden">
+                    <h3 style="margin-bottom: 10px; color: #fff; font-size: 1.1rem;">Tu Mochila (Selecciona para vender)</h3>
+                    <div id="shop-sell-list" class="shop-list">
+                        <!-- Lista generada por JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="reward-screen" class="hidden">
+            <h2>¡Piso Completado!</h2>
+            <p id="reward-desc">Elige un nuevo poder elemental:</p>
+            <div id="reward-options" class="flex-row">
+                <!-- Opciones generadas por JS -->
+            </div>
+            <div id="slot-selection" class="hidden">
+                <p>Tu barra está llena. Elige qué poder quieres reemplazar:</p>
+                <div class="flex-row" style="gap: 10px;">
+                    <button type="button" onclick="replacePower(0)">Reemplazar Slot 1</button>
+                    <button type="button" onclick="replacePower(1)">Reemplazar Slot 2</button>
+                    <button type="button" onclick="replacePower(2)">Reemplazar Slot 3</button>
+                    <button type="button" onclick="replacePower(3)">Reemplazar Slot 4</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="game-over" class="hidden">
+            <h2>Has Muerto</h2>
+            <p>La aventura continúa en otra vida...</p> <!-- Un texto más temático -->
+            <button id="restart-btn">Reencarnar en Piso 1</button> <!-- Texto actualizado -->
+        </div>
+
+        <!-- Controles Móviles Virtuales -->
+        <div id="mobile-controls" class="hidden">
+            <!-- Virtual Joystick Container (Left Side Zone) -->
+            <div id="joystick-zone">
+                <div id="joystick-base">
+                    <div id="joystick-knob"></div>
+                </div>
+            </div>
+            
+            <div id="touch-actions">
+                <div class="power-buttons">
+                    <button type="button" id="btn-p1" class="power-btn">1</button>
+                    <button type="button" id="btn-p2" class="power-btn">2</button>
+                    <button type="button" id="btn-p3" class="power-btn">3</button>
+                    <button type="button" id="btn-p4" class="power-btn">4</button>
+                </div>
+                <button type="button" id="btn-interact" class="hidden">💬</button>
+                <button type="button" id="btn-attack">⚔️</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Advertencia de Orientación Horizontal -->
+    <div id="orientation-warning" class="hidden">
+        <div class="rotate-icon">
+            <svg class="phone-svg" viewBox="0 0 100 100" width="100" height="100">
+                <path d="M 50,10 A 40,40 0 1,1 10,50" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" stroke-dasharray="8 4" />
+                <path d="M 10,50 A 40,40 0 0,1 50,10" fill="none" stroke="var(--primary-color)" stroke-width="5" />
+                <g class="phone-silhouette">
+                    <rect x="36" y="20" width="28" height="60" rx="6" fill="none" stroke="white" stroke-width="4"/>
+                    <circle cx="50" cy="70" r="2.5" fill="white"/>
+                    <line x1="46" y1="26" x2="54" y2="26" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                </g>
+            </svg>
+        </div>
+        <h2>Para una mejor experiencia, gira tu dispositivo horizontalmente.</h2>
+    </div>
+
+    <!-- Tooltip para objetos -->
+    <div id="item-tooltip" class="hidden">
+        <div class="tooltip-name"></div>
+        <div class="tooltip-rarity"></div>
+        <hr class="tooltip-divider">
+        <div class="tooltip-stats"></div>
+    </div>
+
+    <!-- El canvas está separado del UI container para ocupar toda la pantalla por detrás -->
+    <canvas id="game-canvas" tabindex="0" class="hidden"></canvas>
+
+    <script src="js/systems/rarities.js"></script>
+    <script src="js/systems/stats.js"></script>
+    <script src="js/systems/loot.js"></script>
+    <script src="js/systems/drops.js"></script>
+    <script src="js/systems/economy.js"></script>
+    <script src="js/systems/dungeon.js"></script>
+    <script src="js/entities/player_canvas.js"></script>
+    <script src="js/entities/enemy.js"></script>
+    <script src="js/entities/boss.js"></script>
+    <script src="js/entities/Floor10Boss.js"></script>
+    <script src="js/entities/Floor15Boss.js"></script>
+    <script src="js/game.js" defer></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((reg) => console.log('Service Worker registered successfully!', reg.scope))
+                    .catch((err) => console.error('Service Worker registration failed:', err));
+            });
+        }
+    </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 const CACHE_NAME = "isekay-tower-cache-v1";
 const ASSETS = [
   "./",
-  "./index_canvas.html",
+  "./index.html",
   "./style.css",
   "./manifest.json",
   "./assets/ui/icon-192.png",

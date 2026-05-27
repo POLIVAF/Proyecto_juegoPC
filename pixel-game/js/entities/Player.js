@@ -1,12 +1,13 @@
 export default class Player extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
-    // 👇 ESTA LÍNEA ES LA CLAVE
-    const sprite = scene.physics.add.sprite(x, y, 'player');
-
     super(scene, x, y, 'player');
+    
+    // Add to scene and enable physics
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
 
-    // 👇 usamos el sprite real con física
-    return Object.assign(sprite, this);
+    this.setScale(2);
+    this.setCollideWorldBounds(true);
   }
 
   update(cursors) {

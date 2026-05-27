@@ -1,7 +1,7 @@
 {
   "name": "Isekay Tower",
   "short_name": "Isekay",
-  "start_url": "./index_canvas.html",
+  "start_url": "./index.html",
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#1a1a1a",
