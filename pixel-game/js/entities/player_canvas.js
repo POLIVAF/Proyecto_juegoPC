@@ -1,3 +1,49 @@
+// Registry of extensible character classes
+const CHARACTER_CLASSES = {
+    warrior: {
+        name: 'Guerrero',
+        baseMaxHp: 150,
+        baseMaxMana: 50,
+        speed: 2.0, // balanced base speed (mobs are 1.5 + Math.random())
+        baseDamage: 25,
+        color: '#e74c3c',
+        avatar: '⚔️',
+        starterWeapon: {
+            type: 'weapon',
+            name: 'Espada de Dos Manos Básica',
+            color: '#bdc3c7',
+            bonus: 0,
+            desc: 'Arma inicial sin modificadores.'
+        },
+        levelUpBonus: {
+            hp: 20,
+            mana: 5,
+            damage: 3
+        }
+    },
+    mage: {
+        name: 'Mago',
+        baseMaxHp: 80,
+        baseMaxMana: 150,
+        speed: 2.2, // balanced base speed
+        baseDamage: 15,
+        color: '#3498db',
+        avatar: '🧙‍♂️',
+        starterWeapon: {
+            type: 'weapon',
+            name: 'Bastón de Mago Básico',
+            color: '#bdc3c7',
+            bonus: 0,
+            desc: 'Bastón inicial sin modificadores.'
+        },
+        levelUpBonus: {
+            hp: 10,
+            mana: 15,
+            damage: 2
+        }
+    }
+};
+
 class Player {
     constructor(x, y, name, charClass, gender) {
         this.x = x;
@@ -23,33 +69,21 @@ class Player {
         this.immunityTimer = 0;
         this.flashTimer = 0;     // Para el efecto visual de recibir daño
         
-        // Base stats based on class
-        if (this.charClass === 'warrior') {
-            this.baseMaxHp = 150;
-            this.maxHp = 150;
-            this.hp = 150;
-            this.baseMaxMana = 50;
-            this.maxMana = 50;
-            this.mana = 50;
-            this.speed = 3;
-            this.baseDamage = 25; // Store base before equipment
-            this.damage = 25;
-            this.color = this.gender === 'male' ? '#e74c3c' : '#c0392b'; // Reds
-        } else { // Mage
-            this.baseMaxHp = 80;
-            this.maxHp = 80;
-            this.hp = 80;
-            this.baseMaxMana = 150;
-            this.maxMana = 150;
-            this.mana = 150;
-            this.speed = 4;
-            this.baseDamage = 15;
-            this.damage = 15;
-            this.color = this.gender === 'male' ? '#3498db' : '#2980b9'; // Blues
-        }
+        // Base stats registry lookup
+        const classData = CHARACTER_CLASSES[this.charClass] || CHARACTER_CLASSES.warrior;
+        this.baseMaxHp = classData.baseMaxHp;
+        this.maxHp = classData.baseMaxHp;
+        this.hp = classData.baseMaxHp;
+        this.baseMaxMana = classData.baseMaxMana;
+        this.maxMana = classData.baseMaxMana;
+        this.mana = classData.baseMaxMana;
+        this.baseSpeed = classData.speed;
+        this.speed = classData.speed;
+        this.baseDamage = classData.baseDamage;
+        this.damage = classData.baseDamage;
+        this.color = classData.color;
 
         // Inventory & Stats
-        this.damage = this.baseDamage;
         this.coins = 0;
         this.inventory = []; // Max 15 items
         this.inventoryMaxSlots = 15;
@@ -69,23 +103,14 @@ class Player {
         };
 
         // Equip Class Starter Weapon (without modifiers)
-        if (this.charClass === 'warrior') {
-            this.equipment.weapon = {
-                type: 'weapon',
-                name: 'Espada de Dos Manos Básica',
-                color: '#bdc3c7',
-                bonus: 0,
-                desc: 'Arma inicial sin modificadores.'
-            };
-        } else {
-            this.equipment.weapon = {
-                type: 'weapon',
-                name: 'Bastón de Mago Básico',
-                color: '#bdc3c7',
-                bonus: 0,
-                desc: 'Bastón inicial sin modificadores.'
-            };
-        }
+        const starterWep = classData.starterWeapon || {
+            type: 'weapon',
+            name: 'Arma Básica',
+            color: '#bdc3c7',
+            bonus: 0,
+            desc: 'Arma inicial sin modificadores.'
+        };
+        this.equipment.weapon = JSON.parse(JSON.stringify(starterWep));
 
         this.damage = this.getDamage();
         this.immunityTimer = 0;
@@ -112,6 +137,7 @@ class Player {
         this.lastHp = this.hp;
     }
 
+
     gainExp(amount) {
         if (this.level === undefined) this.level = 1;
         if (this.exp === undefined) this.exp = 0;
@@ -125,16 +151,12 @@ class Player {
             this.level++;
             this.nextLevelExp *= 2; // Doubled each level
 
-            // Level Up Stats Boost
-            if (this.charClass === 'warrior') {
-                this.baseMaxHp += 20;
-                this.baseMaxMana += 5;
-                this.baseDamage += 3;
-            } else { // Mage
-                this.baseMaxHp += 10;
-                this.baseMaxMana += 15;
-                this.baseDamage += 2;
-            }
+            // Level Up Stats Boost from class data registry
+            const classData = CHARACTER_CLASSES[this.charClass] || CHARACTER_CLASSES.warrior;
+            const bonuses = classData.levelUpBonus || { hp: 10, mana: 10, damage: 2 };
+            this.baseMaxHp += bonuses.hp;
+            this.baseMaxMana += bonuses.mana;
+            this.baseDamage += bonuses.damage;
             leveledUp = true;
         }
 
@@ -162,8 +184,10 @@ class Player {
     }
 
     recalculateStats() {
-        if (this.baseMaxHp === undefined) this.baseMaxHp = this.charClass === 'warrior' ? 150 : 80;
-        if (this.baseMaxMana === undefined) this.baseMaxMana = this.charClass === 'warrior' ? 50 : 150;
+        const classData = CHARACTER_CLASSES[this.charClass] || CHARACTER_CLASSES.warrior;
+        if (this.baseMaxHp === undefined) this.baseMaxHp = classData.baseMaxHp;
+        if (this.baseMaxMana === undefined) this.baseMaxMana = classData.baseMaxMana;
+        if (this.baseSpeed === undefined) this.baseSpeed = classData.speed;
 
         let extraHp = 0;
         let extraMana = 0;
@@ -171,6 +195,8 @@ class Player {
         let totalDmgPercent = 0;
         let totalDefense = 0;
         let totalCooldownReduction = 0; // in %
+        let totalSpeedPercent = 0; // percentage-based speed modifiers
+        let flatSpeedBonus = 0; // flat speed modifiers
 
         if (this.equipment) {
             for (let slot in this.equipment) {
@@ -182,7 +208,7 @@ class Player {
                     totalDmgPercent += eq.bonus;
                 }
 
-                // Stats from accessories
+                // Stats from accessories / equipment
                 if (eq.stats) {
                     if (eq.stats.fuerza) totalFuerza += eq.stats.fuerza;
                     if (eq.stats.daño) totalDmgPercent += eq.stats.daño / 100;
@@ -190,6 +216,7 @@ class Player {
                     if (eq.stats.mana) extraMana += eq.stats.mana;
                     if (eq.stats.vida) extraHp += eq.stats.vida;
                     if (eq.stats.cooldown) totalCooldownReduction += eq.stats.cooldown;
+                    if (eq.stats.velocidad) totalSpeedPercent += eq.stats.velocidad / 100;
                 }
             }
         }
@@ -210,6 +237,13 @@ class Player {
         // Defense calculations
         this.accessoryDefense = totalDefense;
         this.cooldownReduction = Math.min(50, totalCooldownReduction); // cap at 50%
+
+        // Dynamic speed calculation: base speed + flat bonus + percentage bonus
+        if (this.furyAuraTimer > 0) {
+            totalSpeedPercent += 0.25; // 25% speed bonus during fury aura
+        }
+
+        this.speed = this.baseSpeed * (1 + totalSpeedPercent) + flatSpeedBonus;
     }
 
     getArmor() {
@@ -739,3 +773,6 @@ class Player {
         }
     }
 }
+
+// Expose classes registry globally for systems & initialization
+Player.CLASSES = CHARACTER_CLASSES;

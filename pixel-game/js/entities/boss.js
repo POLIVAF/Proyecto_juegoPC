@@ -68,6 +68,11 @@ class Boss {
     }
 
     update(player, dungeon, deltaTime) {
+        if (this.attackCooldown === undefined) this.attackCooldown = 0;
+        if (this.attackCooldown > 0) {
+            this.attackCooldown--;
+        }
+
         // Handle Status
         if (this.burnTimer > 0) {
             this.hp -= 5 * (deltaTime / 1000); // Burn DPS

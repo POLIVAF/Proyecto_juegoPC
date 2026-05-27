@@ -12,14 +12,14 @@ function generateProceduralStats(slot, rarity, floor) {
   if (isArmor) {
     // Guarantees defense as the primary stat, then adds other stats
     stats["defensa"] = Math.floor(Math.random() * 3) + 1 + Math.floor(floor / 3);
-    pool = ["vida", "fuerza", "mana", "cooldown"];
+    pool = ["vida", "fuerza", "mana", "cooldown", "velocidad"];
     numStats = Math.max(1, numStats - 1);
   } else if (slot === "weapon") {
     // Weapons have offensive stats
-    pool = ["fuerza", "daño", "cooldown", "mana"];
+    pool = ["fuerza", "daño", "cooldown", "mana", "velocidad"];
   } else {
     // Accessories (rings, pendants) can roll anything
-    pool = ["fuerza", "defensa", "daño", "cooldown", "mana", "vida"];
+    pool = ["fuerza", "defensa", "daño", "cooldown", "mana", "vida", "velocidad"];
   }
 
   // Shuffle and select additional stats
@@ -47,6 +47,9 @@ function generateProceduralStats(slot, rarity, floor) {
       case "vida":
         value = (Math.floor(Math.random() * 16) + 15) + floor * 3;
         break;
+      case "velocidad":
+        value = (Math.floor(Math.random() * 5) + 3) + Math.floor(floor / 4);
+        break;
     }
     stats[statName] = value;
   });
@@ -63,5 +66,6 @@ function getStatsDesc(stats) {
   if (stats.cooldown) descLines.push(`+${stats.cooldown}% velocidad ataque`);
   if (stats.mana) descLines.push(`+${stats.mana} mana`);
   if (stats.vida) descLines.push(`+${stats.vida} vida`);
+  if (stats.velocidad) descLines.push(`+${stats.velocidad}% velocidad de movimiento`);
   return descLines.join("<br>");
 }

@@ -250,6 +250,7 @@ function showTooltip(item, event) {
     if (item.stats.cooldown) statsEl.innerHTML += `<div>+${item.stats.cooldown}% velocidad ataque</div>`;
     if (item.stats.mana) statsEl.innerHTML += `<div>+${item.stats.mana} mana</div>`;
     if (item.stats.vida) statsEl.innerHTML += `<div>+${item.stats.vida} vida</div>`;
+    if (item.stats.velocidad) statsEl.innerHTML += `<div>+${item.stats.velocidad}% velocidad de movimiento</div>`;
   } else if (item.bonus !== undefined && item.bonus !== 0) {
     statsEl.innerHTML += `<div>+${Math.round(item.bonus * 100)}% daño</div>`;
   }
@@ -500,6 +501,9 @@ function updateScreenState() {
 
 function setGameState(state) {
   gameState = state;
+  if (state !== "PLAYING") {
+    closeInventory();
+  }
   updateScreenState();
   checkOrientation();
 }
@@ -547,11 +551,7 @@ window.addEventListener("keydown", (e) => {
   }
 
   if (e.key === 'Escape') {
-    const inventoryModal = document.getElementById("inventory-modal");
-    if (inventoryModal) {
-      inventoryModal.classList.add("hidden");
-      if (canvas) canvas.focus();
-    }
+    closeInventory();
   }
   
   if (e.key.toLowerCase() === 'q') {
@@ -561,8 +561,7 @@ window.addEventListener("keydown", (e) => {
         inventoryModal.classList.remove("hidden");
         updateInventoryUI(); // Refresh items on open
       } else {
-        inventoryModal.classList.add("hidden");
-        if (canvas) canvas.focus();
+        closeInventory();
       }
     }
   }
@@ -679,23 +678,15 @@ function resetPlayerOnDeath(player) {
   player.exp = 0;
   player.nextLevelExp = 300;
 
-  // Reset base stats based on character class
-  if (player.charClass === "warrior") {
-    player.baseMaxHp = 150;
-    player.maxHp = 150;
-    player.baseMaxMana = 50;
-    player.maxMana = 50;
-    player.baseDamage = 25;
-    player.speed = 3;
-  } else {
-    // Mage
-    player.baseMaxHp = 80;
-    player.maxHp = 80;
-    player.baseMaxMana = 150;
-    player.maxMana = 150;
-    player.baseDamage = 15;
-    player.speed = 4;
-  }
+  // Reset base stats based on character class data registry
+  const classData = Player.CLASSES[player.charClass] || Player.CLASSES.warrior;
+  player.baseMaxHp = classData.baseMaxHp;
+  player.maxHp = classData.baseMaxHp;
+  player.baseMaxMana = classData.baseMaxMana;
+  player.maxMana = classData.baseMaxMana;
+  player.baseDamage = classData.baseDamage;
+  player.baseSpeed = classData.speed;
+  player.speed = classData.speed;
 
   player.hp = player.maxHp;
   player.mana = player.maxMana;
@@ -705,6 +696,13 @@ function resetPlayerOnDeath(player) {
 
   // Clear inventory, equipment, projectiles and timers
   player.inventory = [];
+  const starterWep = classData.starterWeapon || {
+    type: 'weapon',
+    name: 'Arma Básica',
+    color: '#bdc3c7',
+    bonus: 0,
+    desc: 'Arma inicial sin modificadores.'
+  };
   player.equipment = {
     head: null,
     chest: null,
@@ -714,19 +712,7 @@ function resetPlayerOnDeath(player) {
     ring2: null,
     pendant: null,
     pendant2: null,
-    weapon: player.charClass === 'warrior' ? {
-      type: 'weapon',
-      name: 'Espada de Dos Manos Básica',
-      color: '#bdc3c7',
-      bonus: 0,
-      desc: 'Arma inicial sin modificadores.'
-    } : {
-      type: 'weapon',
-      name: 'Bastón de Mago Básico',
-      color: '#bdc3c7',
-      bonus: 0,
-      desc: 'Bastón inicial sin modificadores.'
-    }
+    weapon: JSON.parse(JSON.stringify(starterWep))
   };
   player.projectiles = [];
   player.immunityTimer = 0;
@@ -862,7 +848,8 @@ function startGame(name, charClass, gender, startFloor, powers, hp, newPlayer) {
       player.reserveHearts = sd.reserveHearts || [];
       
       if (sd.stats) {
-        player.baseDamage = sd.stats.baseDamage !== undefined ? sd.stats.baseDamage : (sd.charClass === 'warrior' ? 25 : 15);
+        const classData = Player.CLASSES[sd.charClass] || Player.CLASSES.warrior;
+        player.baseDamage = sd.stats.baseDamage !== undefined ? sd.stats.baseDamage : classData.baseDamage;
         player.damage = sd.stats.damage || player.damage;
         player.armor = sd.stats.armor || player.armor;
       }
@@ -871,15 +858,24 @@ function startGame(name, charClass, gender, startFloor, powers, hp, newPlayer) {
       player.level = sd.level || 1;
       player.exp = sd.exp || 0;
       player.nextLevelExp = sd.nextLevelExp || 300;
-      player.baseMaxHp = sd.baseMaxHp || (player.charClass === 'warrior' ? 150 : 80);
-      player.baseMaxMana = sd.baseMaxMana || (player.charClass === 'warrior' ? 50 : 150);
+      const classData = Player.CLASSES[player.charClass] || Player.CLASSES.warrior;
+      player.baseMaxHp = sd.baseMaxHp || classData.baseMaxHp;
+      player.baseMaxMana = sd.baseMaxMana || classData.baseMaxMana;
       player.recalculateStats();
     }
 
     updatePowerBarUI();
     updateInventoryUI();
   } else if (player) {
+    const classData = Player.CLASSES[player.charClass] || Player.CLASSES.warrior;
     player.inventory = [];
+    const starterWep = classData.starterWeapon || {
+      type: 'weapon',
+      name: 'Arma Básica',
+      color: '#bdc3c7',
+      bonus: 0,
+      desc: 'Arma inicial sin modificadores.'
+    };
     player.equipment = {
       head: null,
       chest: null,
@@ -889,19 +885,7 @@ function startGame(name, charClass, gender, startFloor, powers, hp, newPlayer) {
       ring2: null,
       pendant: null,
       pendant2: null,
-      weapon: player.charClass === 'warrior' ? {
-        type: 'weapon',
-        name: 'Espada de Dos Manos Básica',
-        color: '#bdc3c7',
-        bonus: 0,
-        desc: 'Arma inicial sin modificadores.'
-      } : {
-        type: 'weapon',
-        name: 'Bastón de Mago Básico',
-        color: '#bdc3c7',
-        bonus: 0,
-        desc: 'Bastón inicial sin modificadores.'
-      }
+      weapon: JSON.parse(JSON.stringify(starterWep))
     };
     player.reserveHearts = [];
     player.coins = 0;
@@ -934,8 +918,8 @@ function saveGame() {
     level: player.level || 1,
     exp: player.exp || 0,
     nextLevelExp: player.nextLevelExp || 300,
-    baseMaxHp: player.baseMaxHp || (player.charClass === 'warrior' ? 150 : 80),
-    baseMaxMana: player.baseMaxMana || (player.charClass === 'warrior' ? 50 : 150),
+    baseMaxHp: player.baseMaxHp || (Player.CLASSES[player.charClass]?.baseMaxHp || 150),
+    baseMaxMana: player.baseMaxMana || (Player.CLASSES[player.charClass]?.baseMaxMana || 50),
     stats: {
       damage: player.damage,
       armor: player.armor,
@@ -1055,11 +1039,8 @@ function initLevel(name, charClass, gender, newPlayer) {
   
   const avatarEl = document.getElementById("hud-avatar-icon");
   if (avatarEl) {
-    if (player.charClass === "mage") {
-      avatarEl.innerText = player.gender === "female" ? "🧙‍♀️" : "🧙‍♂️";
-    } else {
-      avatarEl.innerText = player.gender === "female" ? "🛡️" : "⚔️";
-    }
+    const classData = Player.CLASSES[player.charClass] || Player.CLASSES.warrior;
+    avatarEl.innerText = classData.avatar || "👤";
   }
   
   const floorHUD = document.getElementById("hud-floor");
@@ -1285,8 +1266,8 @@ function update(deltaTime) {
       let dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist < player.width / 2 + e.width / 2) {
-        // Check if enemy can hit
-        if (!(e instanceof Boss) && e.attackCooldown <= 0 && player.immunityTimer <= 0) {
+        if (e.attackCooldown === undefined) e.attackCooldown = 0;
+        if (e.attackCooldown <= 0 && player.immunityTimer <= 0) {
           let finalDmg = Math.max(1, e.damage - player.getArmor());
           player.hp -= finalDmg;
           addFloatingText("-" + Math.round(finalDmg), player.x, player.y - 10, "#e74c3c");
@@ -1303,10 +1284,6 @@ function update(deltaTime) {
 
           e.attackCooldown = 60; // 1 second cooldown between hits
 
-          if (player.hp <= 0) gameOver();
-        } else if (e instanceof Boss && player.immunityTimer <= 0) {
-          let finalDmg = Math.max(1, e.damage - player.getArmor()) * (deltaTime / 1000);
-          player.hp -= finalDmg;
           if (player.hp <= 0) gameOver();
         }
       }
@@ -1363,6 +1340,90 @@ function update(deltaTime) {
       }
       rolledDrops.forEach(drop => droppedItems.push(drop));
       enemies.splice(i, 1);
+    }
+  }
+
+  // Resolve Enemy-Enemy and Enemy-Player collisions
+  // 1. Enemies vs Enemies separation
+  for (let idx1 = 0; idx1 < enemies.length; idx1++) {
+    let e1 = enemies[idx1];
+    for (let idx2 = idx1 + 1; idx2 < enemies.length; idx2++) {
+      let e2 = enemies[idx2];
+      
+      let dx = e2.x - e1.x;
+      let dy = e2.y - e1.y;
+      let dist = Math.sqrt(dx * dx + dy * dy);
+      let minDist = (e1.width + e2.width) / 2;
+      
+      if (dist < minDist) {
+        if (dist === 0) {
+          dx = (Math.random() - 0.5) * 2;
+          dy = (Math.random() - 0.5) * 2;
+          dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        }
+        
+        let overlap = minDist - dist;
+        let pushX = (dx / dist) * overlap * 0.5;
+        let pushY = (dy / dist) * overlap * 0.5;
+        
+        let nextE2X = e2.x + pushX;
+        let nextE2Y = e2.y + pushY;
+        if (dungeon && !dungeon.isWallRect(nextE2X, e2.y, e2.width, e2.height)) {
+          e2.x = nextE2X;
+        }
+        if (dungeon && !dungeon.isWallRect(e2.x, nextE2Y, e2.width, e2.height)) {
+          e2.y = nextE2Y;
+        }
+        
+        let nextE1X = e1.x - pushX;
+        let nextE1Y = e1.y - pushY;
+        if (dungeon && !dungeon.isWallRect(nextE1X, e1.y, e1.width, e1.height)) {
+          e1.x = nextE1X;
+        }
+        if (dungeon && !dungeon.isWallRect(e1.x, nextE1Y, e1.width, e1.height)) {
+          e1.y = nextE1Y;
+        }
+      }
+    }
+  }
+
+  // 2. Enemies vs Player separation
+  for (let e of enemies) {
+    let dx = e.x - player.x;
+    let dy = e.y - player.y;
+    let dist = Math.sqrt(dx * dx + dy * dy);
+    let minDist = (player.width + e.width) / 2;
+    
+    if (dist < minDist) {
+      if (dist === 0) {
+        dx = (Math.random() - 0.5) * 2;
+        dy = (Math.random() - 0.5) * 2;
+        dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      }
+      
+      let overlap = minDist - dist;
+      let pushX = (dx / dist) * overlap;
+      let pushY = (dy / dist) * overlap;
+      
+      let nextEX = e.x + pushX;
+      let nextEY = e.y + pushY;
+      if (dungeon && !dungeon.isWallRect(nextEX, e.y, e.width, e.height)) {
+        e.x = nextEX;
+      }
+      if (dungeon && !dungeon.isWallRect(e.x, nextEY, e.width, e.height)) {
+        e.y = nextEY;
+      }
+      
+      let pushPlayerX = -(dx / dist) * overlap * 0.2;
+      let pushPlayerY = -(dy / dist) * overlap * 0.2;
+      let nextPlayerX = player.x + pushPlayerX;
+      let nextPlayerY = player.y + pushPlayerY;
+      if (dungeon && !dungeon.isWallRect(nextPlayerX, player.y, player.width, player.height)) {
+        player.x = nextPlayerX;
+      }
+      if (dungeon && !dungeon.isWallRect(player.x, nextPlayerY, player.width, player.height)) {
+        player.y = nextPlayerY;
+      }
     }
   }
 
@@ -1742,14 +1803,42 @@ if (backpackBtn) {
   });
 }
 
+function closeInventory() {
+  const modal = document.getElementById("inventory-modal");
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+  hideTooltip();
+  
+  // Clear inventory slots and remove DOM listeners/references to avoid memory leaks
+  const bpGrid = document.getElementById("backpack-grid");
+  if (bpGrid) {
+    bpGrid.innerHTML = "";
+  }
+  
+  const eqSlots = ["head", "chest", "legs", "gloves", "ring", "ring2", "pendant", "pendant2", "weapon"];
+  eqSlots.forEach((slot) => {
+    const el = document.getElementById("eq-" + slot);
+    if (el) {
+      el.onmouseenter = null;
+      el.onmousemove = null;
+      el.onmouseleave = null;
+      el.ontouchstart = null;
+      el.ontouchend = null;
+      el.ontouchcancel = null;
+      el.draggable = false;
+      el.ondragstart = null;
+      el.ondragend = null;
+    }
+  });
+
+  if (canvas) canvas.focus();
+}
+
 const closeInventoryBtn = document.getElementById("close-inventory");
 if (closeInventoryBtn) {
   closeInventoryBtn.addEventListener("click", () => {
-    const modal = document.getElementById("inventory-modal");
-    if (modal) {
-      modal.classList.add("hidden");
-      if (canvas) canvas.focus();
-    }
+    closeInventory();
   });
 }
 
