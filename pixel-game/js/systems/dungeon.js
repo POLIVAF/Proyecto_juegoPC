@@ -25,7 +25,7 @@ class Dungeon {
         this.merchantDoorY = -1;
         this.merchantDoorOpen = false;
         
-        let hasMerchant = (this.floor > 1 && (this.floor - 1) % 4 === 0);
+        let hasMerchant = false;
 
         // Initialize grid with walls (0)
         for (let y = 0; y < this.height; y++) {
@@ -174,8 +174,8 @@ class Dungeon {
         this.merchantDoorX = -1;
         this.merchantDoorY = -1;
         
-        let hasMerchant = (this.floor > 1 && (this.floor - 1) % 4 === 0);
-        this.merchantDoorOpen = !hasMerchant; // Locked if it's a merchant floor
+        let hasMerchant = false;
+        this.merchantDoorOpen = true;
 
         // Initialize grid with walls (0)
         for (let y = 0; y < this.height; y++) {
@@ -226,6 +226,45 @@ class Dungeon {
         }
     }
 
+    generateSafeRoom() {
+        this.rooms = [];
+        this.merchantDoorX = -1;
+        this.merchantDoorY = -1;
+        this.doorOpen = true; // safe room doors are always open
+
+        // Initialize grid with walls (0)
+        for (let y = 0; y < this.height; y++) {
+            this.grid[y] = [];
+            for (let x = 0; x < this.width; x++) {
+                this.grid[y][x] = 0;
+            }
+        }
+
+        // Create a single fixed room in the center
+        let roomWidth = 16;
+        let roomHeight = 16;
+        let roomX = Math.floor((this.width - roomWidth) / 2);
+        let roomY = Math.floor((this.height - roomHeight) / 2);
+
+        let safeRoomObj = { x: roomX, y: roomY, w: roomWidth, h: roomHeight, type: 'safeRoom' };
+        this.createRoom(safeRoomObj);
+        this.rooms.push(safeRoomObj);
+
+        // Put exit door at top center of the room
+        this.exitX = roomX + Math.floor(roomWidth / 2);
+        this.exitY = roomY + 1;
+
+        // Put enter stairs at bottom center of the room
+        this.enterX = roomX + Math.floor(roomWidth / 2);
+        this.enterY = roomY + roomHeight - 2;
+
+        // Let's place some tables (grid value = 2) at the corners of the safe room
+        this.grid[roomY + 3][roomX + 3] = 2;
+        this.grid[roomY + 3][roomX + roomWidth - 4] = 2;
+        this.grid[roomY + roomHeight - 4][roomX + 3] = 2;
+        this.grid[roomY + roomHeight - 4][roomX + roomWidth - 4] = 2;
+    }
+
     intersects(room1, room2) {
         return (room1.x <= room2.x + room2.w &&
                 room1.x + room1.w >= room2.x &&
@@ -270,10 +309,11 @@ class Dungeon {
                 // Check bounds
                 if (c >= 0 && c < this.width && r >= 0 && r < this.height) {
                     let tile = this.grid[r][c];
-                    if (tile === 1) {
-                        // Check if we are inside a merchant room
+                    if (tile === 1 || tile === 2) {
+                        // Check if we are inside a merchant room, special room, or safe room
                         let isInMerchantRoom = false;
                         let isInSpecialRoom = false;
+                        let isInSafeRoom = false;
                         for (let rm of this.rooms) {
                             if (c >= rm.x && c < rm.x + rm.w && r >= rm.y && r < rm.y + rm.h) {
                                 if (rm.type === 'merchant') {
@@ -282,11 +322,52 @@ class Dungeon {
                                 } else if (rm.type === 'special') {
                                     isInSpecialRoom = true;
                                     break;
+                                } else if (rm.type === 'safeRoom') {
+                                    isInSafeRoom = true;
+                                    break;
                                 }
                             }
                         }
 
-                        if (isInMerchantRoom) {
+                        if (isInSafeRoom) {
+                            // Dark warm wooden floor planks
+                            if ((r + c) % 2 === 0) {
+                                ctx.fillStyle = "#5c4033"; // Dark wood brown
+                            } else {
+                                ctx.fillStyle = "#50382c"; // Slightly darker wood brown
+                            }
+                            ctx.fillRect(Math.floor((c - startCol) * this.tileSize + offsetX),
+                                         Math.floor((r - startRow) * this.tileSize + offsetY),
+                                         this.tileSize, this.tileSize);
+                            
+                            // Draw horizontal plank lines
+                            ctx.strokeStyle = "#3e2723"; // Very dark brown
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.moveTo(Math.floor((c - startCol) * this.tileSize + offsetX), Math.floor((r - startRow) * this.tileSize + offsetY));
+                            ctx.lineTo(Math.floor((c - startCol) * this.tileSize + offsetX) + this.tileSize, Math.floor((r - startRow) * this.tileSize + offsetY));
+                            ctx.stroke();
+
+                            // Draw table decoration if tile is 2
+                            if (tile === 2) {
+                                let tx = Math.floor((c - startCol) * this.tileSize + offsetX);
+                                let ty = Math.floor((r - startRow) * this.tileSize + offsetY);
+                                
+                                // Draw wooden table top
+                                ctx.fillStyle = "#8d6e63"; // Lighter brown for table top
+                                ctx.fillRect(tx + 4, ty + 4, this.tileSize - 8, this.tileSize - 8);
+                                ctx.strokeStyle = "#4e342e";
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(tx + 4, ty + 4, this.tileSize - 8, this.tileSize - 8);
+                                
+                                // Table details (legs/shadow)
+                                ctx.fillStyle = "#3e2723";
+                                ctx.fillRect(tx + 6, ty + 6, 4, 4);
+                                ctx.fillRect(tx + this.tileSize - 10, ty + 6, 4, 4);
+                                ctx.fillRect(tx + 6, ty + this.tileSize - 10, 4, 4);
+                                ctx.fillRect(tx + this.tileSize - 10, ty + this.tileSize - 10, 4, 4);
+                            }
+                        } else if (isInMerchantRoom) {
                             ctx.fillStyle = "#5c1d1d"; // Warm red carpet floor
                             ctx.fillRect(Math.floor((c - startCol) * this.tileSize + offsetX),
                                          Math.floor((r - startRow) * this.tileSize + offsetY),
@@ -447,7 +528,7 @@ class Dungeon {
         if (gridX === this.merchantDoorX && gridY === this.merchantDoorY && !this.merchantDoorOpen) {
             return true; // Closed merchant door is a wall
         }
-        return this.grid[gridY][gridX] === 0;
+        return this.grid[gridY][gridX] === 0 || this.grid[gridY][gridX] === 2;
     }
 
     isWallRect(x, y, w, h) {
@@ -462,8 +543,8 @@ class Dungeon {
                 if (c < 0 || c >= this.width || r < 0 || r >= this.height) {
                     return true; // Out of bounds is wall
                 }
-                if (this.grid[r][c] === 0) {
-                    return true; // Wall tile
+                if (this.grid[r][c] === 0 || this.grid[r][c] === 2) {
+                    return true; // Wall tile or table
                 }
                 if (c === this.merchantDoorX && r === this.merchantDoorY && !this.merchantDoorOpen) {
                     return true; // Closed merchant door acts as wall

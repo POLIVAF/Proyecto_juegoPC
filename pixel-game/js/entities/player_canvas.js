@@ -87,6 +87,7 @@ class Player {
         this.coins = 0;
         this.inventory = []; // Max 15 items
         this.inventoryMaxSlots = 15;
+        this.materials = {};
         this.isInventoryOpen = false; // Controla si se ve la mochila
         
         // Structured Equipment Object (9 Slots)
@@ -449,15 +450,17 @@ class Player {
                 this.y = newY;
             }
         }
+        let isSafeRoomFloor = typeof dungeon !== 'undefined' && dungeon && typeof floor === 'string' && floor.endsWith('.1');
+
         // Attack logic via Spacebar
-        if (keys[' '] && this.attackTimer <= 0) {
+        if (keys[' '] && this.attackTimer <= 0 && !isSafeRoomFloor) {
             this.attack(dungeon, true); // Auto-aim!
             this.attackTimer = this.getCooldown(30); // cooldown
         }
 
         // Attack logic via Mouse Click or Hold
         let wantsAttack = mouse.clicked || (window.touchAttackHeld && this.attackTimer <= 0);
-        if (wantsAttack && this.attackTimer <= 0) {
+        if (wantsAttack && this.attackTimer <= 0 && !isSafeRoomFloor) {
             let useAutoAim = false;
             if (mouse.isVirtualButton || window.touchAttackHeld) {
                 // Virtual attack button preserves current facing direction

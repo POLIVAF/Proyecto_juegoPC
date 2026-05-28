@@ -3,7 +3,7 @@
  * Handles coins and equipment roll calculations for defeated enemies, bosses, and chests.
  */
 
-function rollMobDrop(floor, x, y, playerClass) {
+function rollMobDrop(floor, x, y, playerClass, killedEnemiesCount) {
   let drops = [];
   
   // 1. Coins/Gold drop (50% probability)
@@ -27,36 +27,35 @@ function rollMobDrop(floor, x, y, playerClass) {
     });
   }
 
-  // 2. Item drops (20% probability)
+  // 2. Weapon drops based on precise rates
+  let rand = Math.random();
+  if (rand < 0.00000001) { // 0.000001% for Legendary
+    let item = generateClassWeapon("legendary", floor, playerClass);
+    drops.push(createWeaponDropObj(item, x, y));
+  } else if (rand < 0.00000001 + 0.00001) { // 0.001% for Epic
+    let item = generateClassWeapon("epic", floor, playerClass);
+    drops.push(createWeaponDropObj(item, x, y));
+  } else if (rand < 0.00000001 + 0.00001 + 0.01) { // 1% for Rare
+    let item = generateClassWeapon("rare", floor, playerClass);
+    drops.push(createWeaponDropObj(item, x, y));
+  } else if (rand < 0.00000001 + 0.00001 + 0.01 + 0.05) { // 5% for Normal (Common)
+    let item = generateClassWeapon("common", floor, playerClass);
+    drops.push(createWeaponDropObj(item, x, y));
+  }
+
+  // 3. Other item drops (armor, accessories, potions) using existing 20% check
   if (Math.random() < 0.20) {
     let rarity = rollRarity(false);
     let randPool = Math.random();
     let typeSelected;
     
-    if (randPool < 0.20) typeSelected = "weapon";
-    else if (randPool < 0.45) typeSelected = "armor";
-    else if (randPool < 0.65) typeSelected = "ring";
+    // We roll for armor, accessories, or potions here (excluding weapons, which are handled above)
+    if (randPool < 0.35) typeSelected = "armor";
+    else if (randPool < 0.60) typeSelected = "ring";
     else if (randPool < 0.85) typeSelected = "pendant";
     else typeSelected = "potion";
 
-    if (typeSelected === "weapon") {
-      let item = generateClassWeapon(rarity, floor, playerClass);
-      drops.push({
-        x: x,
-        y: y,
-        radius: rarity === "legendary" ? 11 : 10,
-        type: item.type,
-        slot: item.slot,
-        classRestriction: item.classRestriction,
-        color: item.color,
-        name: item.name,
-        rarity: item.rarity,
-        bonus: item.bonus,
-        icon: item.icon,
-        desc: item.desc,
-        stats: item.stats
-      });
-    } else if (typeSelected === "armor") {
+    if (typeSelected === "armor") {
       let item = generateRandomEquipment(floor, rarity);
       drops.push({
         x: x,
@@ -133,7 +132,56 @@ function rollMobDrop(floor, x, y, playerClass) {
     }
   }
 
+  // 4. Crafting material drop check (every 5 kills, with 0.15% probability)
+  if (typeof killedEnemiesCount !== "undefined" && killedEnemiesCount > 0 && killedEnemiesCount % 5 === 0) {
+    if (Math.random() < 0.0015) {
+      let mats = ["Molibdeno", "Níquel", "Hematita", "Carbón"];
+      if (floor >= 6 && floor <= 20) {
+        mats.push("Carbono");
+      }
+      
+      let chosenMatName = mats[Math.floor(Math.random() * mats.length)];
+      let matDetails = {
+        "Molibdeno": { icon: "⚙️", color: "#7f8c8d", type: "material_molibdeno" },
+        "Níquel": { icon: "🔗", color: "#bdc3c7", type: "material_niquel" },
+        "Hematita": { icon: "🪨", color: "#c0392b", type: "material_hematita" },
+        "Carbón": { icon: "🌑", color: "#2c3e50", type: "material_carbon" },
+        "Carbono": { icon: "💎", color: "#3498db", type: "material_carbono" }
+      };
+      
+      let details = matDetails[chosenMatName];
+      drops.push({
+        x: x + (Math.random() - 0.5) * 10,
+        y: y + (Math.random() - 0.5) * 10,
+        radius: 8,
+        type: details.type,
+        color: details.color,
+        name: chosenMatName,
+        icon: details.icon,
+        desc: "Material de crafting para forja y mejoras."
+      });
+    }
+  }
+
   return drops;
+}
+
+function createWeaponDropObj(item, x, y) {
+  return {
+    x: x,
+    y: y,
+    radius: item.rarity === "legendary" ? 11 : 10,
+    type: item.type,
+    slot: item.slot,
+    classRestriction: item.classRestriction,
+    color: item.color,
+    name: item.name,
+    rarity: item.rarity,
+    bonus: item.bonus,
+    icon: item.icon,
+    desc: item.desc,
+    stats: item.stats
+  };
 }
 
 function rollBossDrop(floor, x, y, playerClass) {

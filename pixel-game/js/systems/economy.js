@@ -4,7 +4,7 @@
  */
 
 function getShopItems() {
-  let scaleFloor = typeof floor !== 'undefined' ? floor : 1;
+  let scaleFloor = typeof floor !== 'undefined' ? parseInt(floor) : 1;
   let playerClass = (typeof player !== 'undefined' && player) ? player.charClass : "warrior";
 
   let weaponCommon = generateClassWeapon("common", scaleFloor, playerClass);
@@ -77,7 +77,7 @@ function getShopItems() {
 function getItemSellValue(item) {
   if (!item) return 0;
   
-  let scaleFloor = typeof floor !== 'undefined' ? floor : 1;
+  let scaleFloor = typeof floor !== 'undefined' ? parseInt(floor) : 1;
 
   // Base sell value based on rarity
   let rarity = item.rarity || "common";

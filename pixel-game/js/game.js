@@ -49,7 +49,11 @@ let droppedItems = []; // Items on the ground
 let camera = { x: 0, y: 0, width: 0, height: 0 };
 let floor = 1;
 let maxFloor = 1;
+let killedEnemiesCount = 0;
 let floatingTexts = [];
+let safeRoomNPCs = [];
+let activeDialogNPC = null;
+let activeDialogTimer = 0;
 
 function addFloatingText(text, x, y, color = "#f1c40f") {
   floatingTexts.push({
@@ -253,6 +257,10 @@ function showTooltip(item, event) {
     if (item.stats.velocidad) statsEl.innerHTML += `<div>+${item.stats.velocidad}% velocidad de movimiento</div>`;
   } else if (item.bonus !== undefined && item.bonus !== 0) {
     statsEl.innerHTML += `<div>+${Math.round(item.bonus * 100)}% daño</div>`;
+  }
+
+  if (item.quantity !== undefined) {
+    statsEl.innerHTML += `<div style="color: #f1c40f; font-weight: bold; margin-bottom: 5px;">Cantidad: ${item.quantity}</div>`;
   }
 
   if (item.desc) {
@@ -617,9 +625,33 @@ window.addEventListener("mousedown", (e) => {
     if (isInvOpen && e.target.closest(".inventory-content")) {
       return; 
     }
+    
+    // Check if we clicked on an NPC first
+    let hit = checkNPCClick(e.clientX, e.clientY);
+    if (hit) {
+      mouse.clicked = false;
+      return;
+    }
+    
     mouse.clicked = true;
   }
 });
+
+window.addEventListener("touchstart", (e) => {
+  if (gameState === "PLAYING" && e.touches && e.touches.length > 0) {
+    const invModal = document.getElementById("inventory-modal");
+    const isInvOpen = invModal && !invModal.classList.contains("hidden");
+    if (isInvOpen && e.target.closest(".inventory-content")) {
+      return; 
+    }
+    let touch = e.touches[0];
+    let hit = checkNPCClick(touch.clientX, touch.clientY);
+    if (hit) {
+      // Prevent other actions if we hit an NPC
+      e.preventDefault();
+    }
+  }
+}, { passive: false });
 
 // Block context menu
 window.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -677,6 +709,7 @@ function resetPlayerOnDeath(player) {
   player.level = 1;
   player.exp = 0;
   player.nextLevelExp = 300;
+  killedEnemiesCount = 0;
 
   // Reset base stats based on character class data registry
   const classData = Player.CLASSES[player.charClass] || Player.CLASSES.warrior;
@@ -696,6 +729,7 @@ function resetPlayerOnDeath(player) {
 
   // Clear inventory, equipment, projectiles and timers
   player.inventory = [];
+  player.materials = {};
   const starterWep = classData.starterWeapon || {
     type: 'weapon',
     name: 'Arma Básica',
@@ -790,11 +824,14 @@ function startGame(name, charClass, gender, startFloor, powers, hp, newPlayer) {
     if (savedDataStr) {
       let sd = JSON.parse(savedDataStr);
       maxFloor = sd.maxFloor || sd.floor || 1;
+      killedEnemiesCount = sd.killedEnemiesCount || 0;
     } else {
       maxFloor = startFloor || 1;
+      killedEnemiesCount = 0;
     }
   } else {
     maxFloor = 1;
+    killedEnemiesCount = 0;
   }
   
   initLevel(name, charClass, gender, newPlayer);
@@ -814,6 +851,7 @@ function startGame(name, charClass, gender, startFloor, powers, hp, newPlayer) {
       player.coins = sd.coins || 0;
       
       player.inventory = sd.inventory || [];
+      player.materials = sd.materials || {};
       if (sd.equipment) {
         if (Array.isArray(sd.equipment)) {
           player.equipment = {
@@ -869,6 +907,7 @@ function startGame(name, charClass, gender, startFloor, powers, hp, newPlayer) {
   } else if (player) {
     const classData = Player.CLASSES[player.charClass] || Player.CLASSES.warrior;
     player.inventory = [];
+    player.materials = {};
     const starterWep = classData.starterWeapon || {
       type: 'weapon',
       name: 'Arma Básica',
@@ -910,10 +949,12 @@ function saveGame() {
     mana: player.mana,
     coins: player.coins || 0,
     inventory: [...player.inventory],
+    materials: player.materials ? JSON.parse(JSON.stringify(player.materials)) : {},
     equipment: player.equipment ? JSON.parse(JSON.stringify(player.equipment)) : {},
     reserveHearts: [...player.reserveHearts],
     floor: floor,
     maxFloor: maxFloor,
+    killedEnemiesCount: killedEnemiesCount,
     powers: [...player.powers],
     level: player.level || 1,
     exp: player.exp || 0,
@@ -992,8 +1033,12 @@ function initLevel(name, charClass, gender, newPlayer) {
   merchantKeyObtained = false;
   hasMerchantKey = false;
 
-  let isBossFloor = floor % 5 === 0;
-  if (isBossFloor) {
+  let isSafeRoomFloor = typeof floor === 'string' && floor.endsWith('.1');
+  let isBossFloor = !isSafeRoomFloor && (floor % 5 === 0);
+
+  if (isSafeRoomFloor) {
+    dungeon.generateSafeRoom();
+  } else if (isBossFloor) {
     dungeon.generateBossRoom();
   } else {
     dungeon.generate();
@@ -1002,7 +1047,11 @@ function initLevel(name, charClass, gender, newPlayer) {
   let startRoom = dungeon.rooms[0];
   let startX, startY;
 
-  if (isBossFloor) {
+  if (isSafeRoomFloor) {
+    // Spawn player centered, slightly up from bottom stairs
+    startX = dungeon.enterX * dungeon.tileSize + dungeon.tileSize / 2;
+    startY = dungeon.enterY * dungeon.tileSize - dungeon.tileSize / 2;
+  } else if (isBossFloor) {
     // In boss rooms, spawn player offset by 1 tile above the enter door
     startX = dungeon.enterX * dungeon.tileSize + dungeon.tileSize / 2;
     startY = (dungeon.enterY - 1) * dungeon.tileSize + dungeon.tileSize / 2;
@@ -1055,6 +1104,72 @@ function initLevel(name, charClass, gender, newPlayer) {
   droppedItems = [];
   keys = {};
 
+  if (isSafeRoomFloor) {
+    // 5. CARGA AUTOMÁTICA
+    safeRoomNPCs = [];
+    
+    let merchant = {
+      id: "merchant",
+      name: "Comerciante",
+      x: 860,
+      y: 900,
+      width: 48,
+      height: 48,
+      sprite: "🧙‍♂️",
+      dialog: "¿Tienes objetos para vender o quieres comprar?",
+      interactable: true,
+      clickable: true,
+      touchable: true,
+      canMove: false,
+      invulnerable: true,
+      collision: false,
+      type: "shop"
+    };
+
+    let blacksmith = {
+      id: "blacksmith",
+      name: "Herrero",
+      x: 1020,
+      y: 900,
+      width: 48,
+      height: 48,
+      sprite: "⚒️",
+      dialog: "¿Tienes materiales que pueda usar?",
+      interactable: true,
+      clickable: true,
+      touchable: true,
+      canMove: false,
+      invulnerable: true,
+      collision: false,
+      type: "crafting"
+    };
+
+    let jeweler = {
+      id: "jeweler",
+      name: "Joyero",
+      x: 1180,
+      y: 900,
+      width: 48,
+      height: 48,
+      sprite: "💎",
+      dialog: "Aún espero mis herramientas...",
+      interactable: true,
+      clickable: true,
+      touchable: true,
+      canMove: false,
+      invulnerable: true,
+      collision: false,
+      type: "jewel"
+    };
+
+    safeRoomNPCs.push(merchant, blacksmith, jeweler);
+  } else {
+    // 6. ELIMINACIÓN AUTOMÁTICA
+    safeRoomNPCs = [];
+    activeDialogNPC = null;
+    activeDialogTimer = 0;
+  }
+
   if (isBossFloor) {
     let bossRoom = dungeon.rooms[0];
     let bx = bossRoom.x * dungeon.tileSize + (bossRoom.w * dungeon.tileSize) / 2;
@@ -1067,7 +1182,7 @@ function initLevel(name, charClass, gender, newPlayer) {
     } else {
       enemies.push(new Boss(bx, by, floor));
     }
-  } else {
+  } else if (!isSafeRoomFloor) {
     merchantNPC = null;
     for (let i = 1; i < dungeon.rooms.length; i++) {
       let room = dungeon.rooms[i];
@@ -1158,7 +1273,7 @@ function initLevel(name, charClass, gender, newPlayer) {
     }
   });
   if (dungeon) {
-    dungeon.doorOpen = (floor < maxFloor);
+    dungeon.doorOpen = (floor < maxFloor || isSafeRoomFloor);
     if (floor < maxFloor) {
       dungeon.merchantDoorOpen = true;
     }
@@ -1223,6 +1338,18 @@ function update(deltaTime) {
     let dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < nearestDist) {
       currentInteractable = { type: 'merchant', x: merchantNPC.x, y: merchantNPC.y, dist: dist };
+      nearestDist = dist;
+    }
+  }
+
+  // Check safe room NPCs
+  for (let npc of safeRoomNPCs) {
+    if (!npc.interactable) continue;
+    let dx = player.x - npc.x;
+    let dy = player.y - npc.y;
+    let dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < nearestDist) {
+      currentInteractable = { type: 'npc', npc: npc, x: npc.x, y: npc.y, dist: dist };
       nearestDist = dist;
     }
   }
@@ -1336,7 +1463,8 @@ function update(deltaTime) {
       if (e instanceof Boss) {
         rolledDrops = rollBossDrop(floor, e.x, e.y, player.charClass);
       } else {
-        rolledDrops = rollMobDrop(floor, e.x, e.y, player.charClass);
+        killedEnemiesCount++;
+        rolledDrops = rollMobDrop(floor, e.x, e.y, player.charClass, killedEnemiesCount);
       }
       rolledDrops.forEach(drop => droppedItems.push(drop));
       enemies.splice(i, 1);
@@ -1472,26 +1600,35 @@ function update(deltaTime) {
         if (hudCoins) hudCoins.innerText = player.coins;
         console.log("Monedas de oro obtenidas: " + it.value + ". Total: " + player.coins);
       } else {
-        // Pick up item if backpack is not full
-        if (player.inventory.length < 15) {
-          player.inventory.push({
-            type: it.type,
-            name: it.name,
-            rarity: it.rarity,
-            color: it.color,
-            bonus: it.bonus,
-            hpBonus: it.hpBonus,
-            healAmount: it.healAmount,
-            manaAmount: it.manaAmount,
-            slot: it.slot,
-            classRestriction: it.classRestriction,
-            icon: it.icon,
-            desc: it.desc,
-            stats: it.stats
-          });
-          addFloatingText(it.name, it.x, it.y, it.color || "#fff");
+        if (it.type && it.type.startsWith("material_")) {
+          player.materials = player.materials || {};
+          player.materials[it.type] = (player.materials[it.type] || 0) + 1;
+          addFloatingText(it.name + " +1 📦", it.x, it.y, it.color || "#fff");
           droppedItems.splice(i, 1);
           updateInventoryUI();
+          saveGame();
+        } else {
+          // Pick up item if backpack is not full
+          if (player.inventory.length < 15) {
+            player.inventory.push({
+              type: it.type,
+              name: it.name,
+              rarity: it.rarity,
+              color: it.color,
+              bonus: it.bonus,
+              hpBonus: it.hpBonus,
+              healAmount: it.healAmount,
+              manaAmount: it.manaAmount,
+              slot: it.slot,
+              classRestriction: it.classRestriction,
+              icon: it.icon,
+              desc: it.desc,
+              stats: it.stats
+            });
+            addFloatingText(it.name, it.x, it.y, it.color || "#fff");
+            droppedItems.splice(i, 1);
+            updateInventoryUI();
+          }
         }
       }
     }
@@ -1559,6 +1696,9 @@ function update(deltaTime) {
       floatingTexts.splice(i, 1);
     }
   }
+
+  // Update safe room NPCs dialogs and timers
+  updateSafeRoomNPCs(deltaTime);
 }
 
 function draw() {
@@ -1623,10 +1763,20 @@ function draw() {
           ctx.fillText(it.icon, rx, ry);
         }
       } else {
-        ctx.arc(it.x - camera.x, it.y - camera.y, it.radius, 0, Math.PI * 2);
+        let rx = it.x - camera.x;
+        let ry = it.y - camera.y;
+        ctx.arc(rx, ry, it.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#fff";
         ctx.stroke();
+
+        if (it.icon) {
+          ctx.fillStyle = "#fff";
+          ctx.font = `${Math.floor(it.radius * 1.3)}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(it.icon, rx, ry);
+        }
       }
     }
   }
@@ -1665,6 +1815,9 @@ function draw() {
     ctx.fillRect(mx + 7, my + 6, 2, 2);
   }
 
+  // Draw safe room NPCs
+  drawSafeRoomNPCs(ctx, camera);
+
   player.draw(ctx, camera);
 
   // Draw Interaction Prompt above player's head
@@ -1679,6 +1832,8 @@ function draw() {
     if (currentInteractable.type === 'door') {
       text = hasMerchantKey ? "Presiona E para abrir con Llave" : "Puerta Cerrada (Derrota enemigos)";
     } else if (currentInteractable.type === 'merchant') {
+      text = "Presiona E para hablar";
+    } else if (currentInteractable.type === 'npc') {
       text = "Presiona E para hablar";
     } else if (currentInteractable.type === 'chest') {
       let isLocked = false;
@@ -1737,6 +1892,32 @@ function draw() {
     ctx.fillText(ft.text, ft.x - camera.x, ft.y - camera.y);
   }
   ctx.restore();
+
+  // If in safe room, draw warm ambient lighting overlay
+  let isSafeRoomFloor = typeof floor === 'string' && floor.endsWith('.1');
+  if (isSafeRoomFloor && player) {
+    ctx.save();
+    let px = player.x - camera.x;
+    let py = player.y - camera.y;
+    let glowGrad = ctx.createRadialGradient(
+      px, py, 50,
+      px, py, Math.max(canvas.width, canvas.height)
+    );
+    glowGrad.addColorStop(0, 'rgba(255, 200, 100, 0.06)'); // warm center
+    glowGrad.addColorStop(0.5, 'rgba(230, 120, 40, 0.08)'); // warmer mid
+    glowGrad.addColorStop(1, 'rgba(100, 30, 10, 0.15)'); // dark warm vignette edges
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+
+  // Draw Boss HUD if a boss is active
+  for (let e of enemies) {
+    if (e instanceof Boss && typeof e.drawHUD === 'function') {
+      e.drawHUD(ctx);
+      break;
+    }
+  }
 
   ctx.restore();
 }
@@ -1798,6 +1979,24 @@ if (backpackBtn) {
     const modal = document.getElementById("inventory-modal");
     if (modal) {
       modal.classList.remove("hidden");
+      
+      const tabObjects = document.getElementById("inv-tab-objects");
+      const tabMaterials = document.getElementById("inv-tab-materials");
+      const backpackTab = document.getElementById("inventory-backpack-tab");
+      const materialsTab = document.getElementById("inventory-materials-tab");
+      if (tabObjects && tabMaterials && backpackTab && materialsTab) {
+        tabObjects.classList.add("active");
+        tabObjects.style.background = "#8e44ad";
+        tabObjects.style.color = "white";
+        
+        tabMaterials.classList.remove("active");
+        tabMaterials.style.background = "rgba(255, 255, 255, 0.08)";
+        tabMaterials.style.color = "#ccc";
+        
+        backpackTab.classList.remove("hidden");
+        materialsTab.classList.add("hidden");
+      }
+      
       updateInventoryUI();
     }
   });
@@ -1814,6 +2013,11 @@ function closeInventory() {
   const bpGrid = document.getElementById("backpack-grid");
   if (bpGrid) {
     bpGrid.innerHTML = "";
+  }
+
+  const mGrid = document.getElementById("materials-grid");
+  if (mGrid) {
+    mGrid.innerHTML = "";
   }
   
   const eqSlots = ["head", "chest", "legs", "gloves", "ring", "ring2", "pendant", "pendant2", "weapon"];
@@ -2007,7 +2211,115 @@ function updateInventoryUI() {
       handleDrop(e, "drop_zone", null);
     };
   }
+
+  updateMaterialsUI();
 }
+
+function updateMaterialsUI() {
+  if (!player) return;
+
+  const mGrid = document.getElementById("materials-grid");
+  if (!mGrid) return;
+  mGrid.innerHTML = "";
+
+  const materialTypes = [
+    { type: "material_molibdeno", name: "Molibdeno", icon: "⚙️", color: "#7f8c8d", desc: "Material de crafting para forja y mejoras.", rarity: "common" },
+    { type: "material_niquel", name: "Níquel", icon: "🔗", color: "#bdc3c7", desc: "Material de crafting para forja y mejoras.", rarity: "common" },
+    { type: "material_hematita", name: "Hematita", icon: "🪨", color: "#c0392b", desc: "Material de crafting para forja y mejoras.", rarity: "common" },
+    { type: "material_carbon", name: "Carbón", icon: "🌑", color: "#2c3e50", desc: "Material de crafting para forja y mejoras.", rarity: "common" },
+    { type: "material_carbono", name: "Carbono", icon: "💎", color: "#3498db", desc: "Material de crafting para forja y mejoras.", rarity: "rare" }
+  ];
+
+  player.materials = player.materials || {};
+
+  materialTypes.forEach((mat) => {
+    let qty = player.materials[mat.type] || 0;
+    
+    let slot = document.createElement("div");
+    slot.className = "inv-slot";
+    slot.style.backgroundColor = mat.color;
+    
+    slot.innerHTML = mat.icon;
+
+    if (qty > 0) {
+      slot.style.opacity = "1";
+      let badge = document.createElement("span");
+      badge.className = "item-count";
+      badge.innerText = "x" + qty;
+      slot.appendChild(badge);
+    } else {
+      slot.style.opacity = "0.35";
+      let badge = document.createElement("span");
+      badge.className = "item-count";
+      badge.style.background = "#7f8c8d";
+      badge.innerText = "x0";
+      slot.appendChild(badge);
+    }
+
+    let matItem = {
+      type: mat.type,
+      name: mat.name,
+      icon: mat.icon,
+      color: mat.color,
+      desc: mat.desc,
+      quantity: qty,
+      rarity: mat.rarity
+    };
+
+    slot.onmouseenter = (e) => showTooltip(matItem, e);
+    slot.onmousemove = positionTooltip;
+    slot.onmouseleave = hideTooltip;
+    slot.ontouchstart = (e) => { showTooltip(matItem, e); };
+    slot.ontouchend = hideTooltip;
+    slot.ontouchcancel = hideTooltip;
+
+    slot.draggable = false;
+    
+    mGrid.appendChild(slot);
+  });
+}
+
+function setupInventoryTabs() {
+  const tabObjects = document.getElementById("inv-tab-objects");
+  const tabMaterials = document.getElementById("inv-tab-materials");
+  const backpackTab = document.getElementById("inventory-backpack-tab");
+  const materialsTab = document.getElementById("inventory-materials-tab");
+
+  if (tabObjects && tabMaterials && backpackTab && materialsTab) {
+    tabObjects.onclick = () => {
+      tabObjects.classList.add("active");
+      tabObjects.style.background = "#8e44ad";
+      tabObjects.style.color = "white";
+      
+      tabMaterials.classList.remove("active");
+      tabMaterials.style.background = "rgba(255, 255, 255, 0.08)";
+      tabMaterials.style.color = "#ccc";
+      
+      backpackTab.classList.remove("hidden");
+      materialsTab.classList.add("hidden");
+      updateInventoryUI();
+    };
+
+    tabMaterials.onclick = () => {
+      tabMaterials.classList.add("active");
+      tabMaterials.style.background = "#8e44ad";
+      tabMaterials.style.color = "white";
+      
+      tabObjects.classList.remove("active");
+      tabObjects.style.background = "rgba(255, 255, 255, 0.08)";
+      tabObjects.style.color = "#ccc";
+      
+      backpackTab.classList.add("hidden");
+      materialsTab.classList.remove("hidden");
+      updateMaterialsUI();
+    };
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  setupInventoryTabs();
+});
+setupInventoryTabs();
 
 function useItem(index) {
   if (!player || index >= player.inventory.length) return;
@@ -2089,6 +2401,16 @@ function useItem(index) {
   }
 
   switch (item.type) {
+    case "material_molibdeno":
+    case "material_niquel":
+    case "material_hematita":
+    case "material_carbon":
+    case "material_carbono":
+      addFloatingText("Material de Crafting", player.x, player.y - 20, "#95a5a6");
+      console.log("Los materiales no se consumen directamente.");
+      canUse = false;
+      break;
+
     case "red_potion":
       let heal = item.healAmount || 15;
       player.hp = Math.min(player.maxHp, player.hp + heal);
@@ -2396,8 +2718,17 @@ function finishReward() {
       ? "Elige una nueva habilidad de combate:" 
       : "Elige un nuevo poder elemental:";
   }
-  floor++;
-  maxFloor = Math.max(maxFloor, floor);
+  
+  if (floor % 5 === 0) {
+    floor = floor + ".1";
+  } else {
+    floor++;
+  }
+  
+  let parsedMaxFloor = typeof maxFloor === 'string' ? parseFloat(maxFloor) : maxFloor;
+  let parsedFloor = typeof floor === 'string' ? parseFloat(floor) : floor;
+  maxFloor = Math.max(parsedMaxFloor, parsedFloor);
+
   initLevel(player.name, player.charClass, player.gender, false);
   saveGame();
   setGameState("PLAYING");
@@ -2579,6 +2910,8 @@ function handleInteraction() {
     }
   } else if (currentInteractable.type === 'merchant') {
     openShopModal();
+  } else if (currentInteractable.type === 'npc') {
+    interactWithNPC(currentInteractable.npc);
   } else if (currentInteractable.type === 'chest') {
     let chest = currentInteractable.target;
     let room = getRoomAt(chest.x, chest.y);
@@ -2606,8 +2939,24 @@ function handleInteraction() {
       addFloatingText("¡Derrota a todos los enemigos primero!", player.x, player.y - 20, "#e74c3c");
     }
   } else if (currentInteractable.type === 'enter_door') {
-    if (floor > 1) {
-      floor--;
+    let canGoDown = false;
+    if (typeof floor === 'string' && floor.endsWith('.1')) {
+      canGoDown = true;
+    } else if (floor > 1) {
+      canGoDown = true;
+    }
+    
+    if (canGoDown) {
+      if (typeof floor === 'string' && floor.endsWith('.1')) {
+        floor = Math.floor(parseFloat(floor));
+      } else {
+        let prevFloor = floor - 1;
+        if (prevFloor % 5 === 0 && prevFloor > 0) {
+          floor = prevFloor + ".1";
+        } else {
+          floor = prevFloor;
+        }
+      }
       initLevel(player.name, player.charClass, player.gender, false);
       saveGame();
       console.log(`¡Retrocediendo al Piso ${floor}!`);
@@ -2617,15 +2966,35 @@ function handleInteraction() {
 }
 
 function advanceFloor() {
-  if (floor + 1 <= maxFloor) {
-    floor++;
+  let nextFloor;
+  if (typeof floor === 'string' && floor.endsWith('.1')) {
+    nextFloor = Math.floor(parseFloat(floor)) + 1;
+  } else {
+    nextFloor = floor + 1;
+  }
+
+  let parsedMaxFloor = typeof maxFloor === 'string' ? parseFloat(maxFloor) : maxFloor;
+  let parsedNextFloor = typeof nextFloor === 'string' ? parseFloat(nextFloor) : nextFloor;
+
+  if (parsedNextFloor <= parsedMaxFloor) {
+    floor = nextFloor;
     initLevel(player.name, player.charClass, player.gender, false);
     saveGame();
     addFloatingText(`Piso ${floor}`, player.x, player.y - 20, "#2ecc71");
     console.log(`¡Avanzando al Piso ${floor} (Bypass de Recompensa)!`);
   } else {
-    saveGame();
-    showRewardScreen();
+    // If we completed a boss floor (multiple of 5), show reward screen
+    if (floor % 5 === 0) {
+      saveGame();
+      showRewardScreen();
+    } else {
+      floor = nextFloor;
+      maxFloor = Math.max(parsedMaxFloor, parsedNextFloor);
+      initLevel(player.name, player.charClass, player.gender, false);
+      saveGame();
+      addFloatingText(`Piso ${floor}`, player.x, player.y - 20, "#2ecc71");
+      console.log(`¡Avanzando al Piso ${floor}!`);
+    }
   }
 }
 
@@ -2996,3 +3365,125 @@ window.toggleFullscreen = toggleFullscreen;
 
 // Initialize state classes on startup
 setGameState("MENU");
+
+// ==========================================================================
+// SAFE ROOM NPC HELPERS
+// ==========================================================================
+
+function updateSafeRoomNPCs(deltaTime) {
+  if (activeDialogTimer > 0) {
+    activeDialogTimer -= deltaTime;
+    if (activeDialogTimer <= 0) {
+      activeDialogNPC = null;
+    }
+  }
+}
+
+function drawSafeRoomNPCs(ctx, camera) {
+  for (let npc of safeRoomNPCs) {
+    let rx = npc.x - camera.x;
+    let ry = npc.y - camera.y;
+    
+    // Draw NPC body/emoji
+    ctx.save();
+    ctx.fillStyle = "rgba(142, 68, 173, 0.4)"; // Translucent purple backing
+    ctx.fillRect(rx - npc.width / 2, ry - npc.height / 2, npc.width, npc.height);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = '28px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(npc.sprite, rx, ry);
+    ctx.restore();
+    
+    // Draw NPC Name Label underneath
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+    ctx.lineWidth = 1;
+    ctx.font = "bold 11px 'Courier New', Courier, monospace";
+    let nameW = ctx.measureText(npc.name).width;
+    ctx.fillRect(rx - nameW / 2 - 5, ry + npc.height / 2 + 2, nameW + 10, 16);
+    ctx.strokeRect(rx - nameW / 2 - 5, ry + npc.height / 2 + 2, nameW + 10, 16);
+    ctx.fillStyle = "#f1c40f"; // Gold text for names
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(npc.name, rx, ry + npc.height / 2 + 10);
+    ctx.restore();
+  }
+  
+  // Draw dialogue bubble if active
+  if (activeDialogNPC) {
+    let npc = activeDialogNPC;
+    let rx = npc.x - camera.x;
+    let ry = npc.y - camera.y - npc.height / 2 - 25; // Above NPC
+    
+    ctx.save();
+    ctx.font = "12px 'Courier New', Courier, monospace";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    let textWidth = ctx.measureText(npc.dialog).width;
+    let paddingX = 12;
+    let paddingY = 6;
+    let boxW = textWidth + paddingX * 2;
+    let boxH = 26;
+    
+    // Speech bubble background
+    ctx.fillStyle = 'rgba(20, 15, 25, 0.9)'; // Dark warm background
+    ctx.strokeStyle = '#f1c40f'; // Golden border
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(rx - boxW / 2, ry - boxH / 2, boxW, boxH);
+    ctx.strokeRect(rx - boxW / 2, ry - boxH / 2, boxW, boxH);
+    
+    // Dialogue text
+    ctx.fillStyle = '#fff';
+    ctx.fillText(npc.dialog, rx, ry);
+    
+    // Draw small arrow pointing down from bubble
+    ctx.fillStyle = 'rgba(20, 15, 25, 0.9)';
+    ctx.beginPath();
+    ctx.moveTo(rx - 6, ry + boxH / 2);
+    ctx.lineTo(rx + 6, ry + boxH / 2);
+    ctx.lineTo(rx, ry + boxH / 2 + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#f1c40f';
+    ctx.beginPath();
+    ctx.moveTo(rx - 6, ry + boxH / 2);
+    ctx.lineTo(rx, ry + boxH / 2 + 6);
+    ctx.lineTo(rx + 6, ry + boxH / 2);
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+}
+
+function interactWithNPC(npc) {
+  if (!npc) return;
+  activeDialogNPC = npc;
+  activeDialogTimer = 4000; // 4 seconds in milliseconds
+  
+  if (npc.id === "merchant") {
+    openShopModal();
+  }
+}
+
+function checkNPCClick(clientX, clientY) {
+  if (gameState !== "PLAYING") return false;
+  
+  // Convert screen coordinates to world coordinates
+  let clickX = clientX + camera.x;
+  let clickY = clientY + camera.y;
+
+  for (let npc of safeRoomNPCs) {
+    if (!npc.interactable) continue;
+    // Bounding box check
+    if (clickX >= npc.x - npc.width / 2 && clickX <= npc.x + npc.width / 2 &&
+        clickY >= npc.y - npc.height / 2 && clickY <= npc.y + npc.height / 2) {
+      interactWithNPC(npc);
+      return true;
+    }
+  }
+  return false;
+}
