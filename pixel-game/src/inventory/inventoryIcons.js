@@ -7,6 +7,15 @@ import dropletIcon from "lucide-static/icons/droplet.svg";
 import scrollIcon from "lucide-static/icons/scroll.svg";
 import heartIcon from "lucide-static/icons/heart.svg";
 import gemIcon from "lucide-static/icons/gem.svg";
+import backpackIcon from "lucide-static/icons/backpack.svg";
+import coinsIcon from "lucide-static/icons/coins.svg";
+import settingsIcon from "lucide-static/icons/settings.svg";
+import sparklesIcon from "lucide-static/icons/sparkles.svg";
+import flaskIcon from "lucide-static/icons/flask-round.svg";
+import flameIcon from "lucide-static/icons/flame.svg";
+import dropletsIcon from "lucide-static/icons/droplets.svg";
+import mountainIcon from "lucide-static/icons/mountain.svg";
+import windIcon from "lucide-static/icons/wind.svg";
 
 // SVG URL mappings
 const SVG_URLS = {
@@ -18,7 +27,16 @@ const SVG_URLS = {
   droplet: dropletIcon,
   scroll: scrollIcon,
   heart: heartIcon,
-  gem: gemIcon
+  gem: gemIcon,
+  backpack: backpackIcon,
+  coins: coinsIcon,
+  settings: settingsIcon,
+  sparkles: sparklesIcon,
+  flask: flaskIcon,
+  flame: flameIcon,
+  droplets: dropletsIcon,
+  mountain: mountainIcon,
+  wind: windIcon
 };
 
 // Caches for optimization
@@ -57,7 +75,7 @@ async function preloadAllIcons() {
 
 /**
  * Converts manipulated SVG string to a canvas-compatible Image object
- * Uses Blob, URL.createObjectURL, onload/onerror callbacks, andURL.revokeObjectURL for safety
+ * Uses Blob, URL.createObjectURL, onload/onerror callbacks, and URL.revokeObjectURL for safety
  */
 function svgToImage(svgString, color, size) {
   return new Promise((resolve, reject) => {
@@ -114,6 +132,37 @@ async function getIconImage(iconName, color, size) {
 }
 
 /**
+ * Gets customized Image object synchronously if already cached, otherwise triggers generation in background
+ */
+function getCachedIconImage(iconName, color, size) {
+  const cacheKey = `${iconName}_${color}_${size}`;
+  if (imageCache.has(cacheKey)) {
+    return imageCache.get(cacheKey);
+  }
+  // Trigger background creation
+  getIconImage(iconName, color, size);
+  return null;
+}
+
+/**
+ * Gets a customized inline SVG tag string synchronously from cache
+ */
+function getIconSvg(iconName, color = "currentColor", size = 24) {
+  const url = SVG_URLS[iconName];
+  if (!url) return "";
+  const rawSvg = rawSvgCache.get(url);
+  if (!rawSvg) {
+    getRawSvg(url); // trigger loading in background
+    return "";
+  }
+  let processedSvg = rawSvg;
+  processedSvg = processedSvg.replace(/stroke="currentColor"/g, `stroke="${color}"`);
+  processedSvg = processedSvg.replace(/width="24"/g, `width="${size}"`);
+  processedSvg = processedSvg.replace(/height="24"/g, `height="${size}"`);
+  return processedSvg;
+}
+
+/**
  * Maps item parameters to Lucide icon key names
  */
 function getIconName(item) {
@@ -124,9 +173,21 @@ function getIconName(item) {
   const name = item.name || "";
   const icon = item.icon || "";
 
+  // Coins
+  if (type === "coin") {
+    return "coins";
+  }
+
+  // Materials
+  if (type === "material_molibdeno") return "settings";
+  if (type === "material_niquel") return "shield";
+  if (type === "material_hematita") return "mountain";
+  if (type === "material_carbon") return "flame";
+  if (type === "material_carbono") return "gem";
+
   // Potions
   if (type.includes("potion") || type === "red_potion" || type === "blue_potion") {
-    return "droplet";
+    return "flask";
   }
 
   // Scrolls
@@ -200,6 +261,8 @@ window.InventoryIcons = {
   imageCache,
   preloadAllIcons,
   getIconImage,
+  getCachedIconImage,
+  getIconSvg,
   getIconName,
   renderIconToSlot
 };

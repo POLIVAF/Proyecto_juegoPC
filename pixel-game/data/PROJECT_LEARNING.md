@@ -251,6 +251,44 @@ Para mantener el gameplay limpio, justo y libre de fugas de memoria, se establec
   - [style.css](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/style.css)
 - **Qué NO volver a hacer**: Inicializar componentes DOM o listeners de eventos múltiples veces fuera de los eventos hook de carga estándar (`DOMContentLoaded`).
 
+### 19. Integración Total de Iconografía Lucide y Canvas SVG Drops
+- **Problema**: Presencia de emojis de texto en el HUD de juego, slots de inventario vacíos/cargados, listas de compra/venta de la tienda del comerciante, y botines en el suelo, rompiendo la estética premium deseada.
+- **Causa**: Limitación técnica original al usar caracteres Unicode planos para los iconos.
+- **Solución**:
+  - Se configuró la importación completa de SVGs desde `lucide-static/icons/` en `inventoryIcons.js`.
+  - Se crearon utilidades de conversión de SVG a imagen (`svgToImage`) y almacenamiento en caché para generar dinámicamente objetos `Image` compatibles con Canvas 2D.
+  - Se modificaron las rutinas de dibujo del suelo (`draw()` en `game.js`) para invocar a `getCachedIconImage()`, pintando los iconos SVG con sus respectivos colores y tamaños temáticos sin usar emojis de texto.
+  - Se actualizaron las pantallas de inventario (`updateInventoryUI()`), materiales (`updateMaterialsUI()`) y tienda (`updateShopUI()`) para inyectar dinámicamente las cadenas SVG de Lucide personalizadas en los nodos DOM, eliminando por completo los caracteres emoji de la UI.
+- **Archivos Afectados**:
+  - [inventoryIcons.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/src/inventory/inventoryIcons.js)
+  - [index.html](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/index.html)
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+- **Qué NO volver a hacer**: Utilizar emojis Unicode de texto en vistas de juego o elementos de interfaz cuando se cuenta con el sistema de iconografía dinámica de Lucide pre-cargado.
+
+### 20. Depth Sorting Dinámico Real (Y-Sorting)
+- **Problema**: El personaje se dibujaba por detrás de los slimes o NPCs incluso cuando estaba verticalmente por debajo de ellos en el lienzo de juego, rompiendo el efecto de profundidad tridimensional.
+- **Causa**: La ordenación en la cola de renderizado en `draw()` no consideraba el tamaño/altura visual de las hitboxes de los sprites, usando únicamente la coordenada `y` central o superior.
+- **Solución**: Se agregaron las dimensiones reales de cada entidad a la lista ordenada de renderizado y se modificó la función de ordenación para comparar el borde inferior (pies) de cada objeto físico: `(a.y + a.height) - (b.y + b.height)`.
+- **Archivos Afectados**:
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+- **Qué NO volver a hacer**: Ordenar elementos en una capa de renderizado de proyección 2D isométrica o cenital sin tener en cuenta la base de apoyo visual de las entidades.
+
+### 21. Eliminación de Tooltips Fantasma mediante Event Listeners Globales
+- **Problema**: Cajas emergentes de información de objetos (`#item-tooltip`) quedaban flotando y congeladas en la pantalla al mover el ratón rápidamente fuera del inventario o al destruirse/recrearse slots de equipamiento dinámicamente.
+- **Causa**: El rediseño dinámico de elementos DOM provocaba que los listeners `mouseleave` locales se desvincularan del cursor sin poder disparar la ocultación del tooltip.
+- **Solución**: Se registraron listeners globales de `mousemove` y `touchmove` sobre el objeto `window` que determinan si el cursor o toque actual está sobre algún slot activo (`.inv-slot` / `.eq-slot`). En caso contrario, fuerzan inmediatamente la invocación de `hideTooltip()`.
+- **Archivos Afectados**:
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+- **Qué NO volver a hacer**: Confiar exclusivamente en listeners `mouseleave` locales en celdas de cuadrículas dinámicas que son destruidas y regeneradas con frecuencia.
+
+### 22. Balance de Velocidad en Enemigos del Piso 2
+- **Problema**: Los enemigos de tipo veneno generados en el Piso 2 se movían extremadamente rápido, imposibilitando que el jugador los esquivara o combatiera estratégicamente.
+- **Causa**: La bonificación de velocidad base añadida por el tipo `poison` sumaba velocidad sin control sobre la progresión del nivel del piso actual.
+- **Solución**: Se incluyó un factor de corrección de velocidad del `30%` (`this.speed *= 0.7`) en el constructor de `Enemy` cuando se detecta que la entidad pertenece al Piso 2, manteniendo sus velocidades dentro de un rango equilibrado (1.75 a 2.45).
+- **Archivos Afectados**:
+  - [enemy.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/entities/enemy.js)
+- **Qué NO volver a hacer**: Aplicar multiplicadores o sumas de velocidad fijas en mobs especiales sin validar su impacto sobre la jugabilidad y la velocidad máxima de desplazamiento del jugador.
+
 ---
 
 ## 🏗️ Convenciones y Arquitectura
@@ -338,7 +376,7 @@ El código del juego se organiza en directorios modulares claros:
 * **Objetivo**: Garantizar colisiones reales con deslizamiento suave (sliding) entre el jugador, enemigos, NPCs y cofres, corregir solapamientos mediante profundidad visual (Y-sorted), limpiar la UI móvil reemplazando el botón flotante de diálogo por interacciones táctiles directas, asegurar zonas seguras de respawn libre de enemigos con protección de invulnerabilidad, y equilibrar de forma estricta las tablas de botín para enemigos comunes y bosses adaptadas al nivel de jugador.
 * **Estado**: Implementación de `isSolidAt` y Y-Sorting [COMPLETADO], Toque directo en interactivos [COMPLETADO], Spawn seguro con invulnerabilidad de 3s [COMPLETADO], y Loot Tables equilibradas con progresión adaptativa al nivel de jugador [COMPLETADO].
 
-### Fase 6: Implementación de Rareza Mítica, Compatibilidad Multi-Navegador y Optimización General
-* **Objetivo**: Diseñar y registrar la rareza Mítica, habilitar efectos estéticos de resplandor (glow) en Canvas y CSS, balancear la tabla de drop de bosses (5% Mítico, 20% Legendario, 75% Épico), comprobar compatibilidad y escalado en Google Chrome, Mozilla Firefox, Microsoft Edge, Opera y Safari, y limpiar listeners/llamadas redundantes de inicialización de la interfaz.
-* **Estado**: Registro de rareza mítica y stats de nivel 6 [COMPLETADO], Renderizado y bordes de resplandor en inventario y suelo [COMPLETADO], Balance de drops de bosses [COMPLETADO], y eliminación de duplicados en carga de scripts de la UI [COMPLETADO].
+### Fase 6: Implementación de Rareza Mítica, Compatibilidad Multi-Navegador, Iconografía Lucide y Optimización General
+* **Objetivo**: Diseñar y registrar la rareza Mítica, habilitar efectos estéticos de resplandor (glow) en Canvas y CSS, balancear la tabla de drop de bosses (5% Mítico, 20% Legendario, 75% Épico), comprobar compatibilidad y escalado en Google Chrome, Mozilla Firefox, Microsoft Edge, Opera y Safari, y limpiar listeners/llamadas redundantes de inicialización de la interfaz. Integrar la iconografía de Lucide para eliminar emojis.
+* **Estado**: Registro de rareza mítica y stats de nivel 6 [COMPLETADO], Renderizado y bordes de resplandor en inventario y suelo [COMPLETADO], Balance de drops de bosses [COMPLETADO], eliminación de duplicados en carga de scripts de la UI [COMPLETADO], precarga e integración completa de iconos `lucide-static` SVG en HUD, inventario, materiales, tienda y botines del suelo [COMPLETADO].
 

@@ -694,7 +694,30 @@ if (canvas) {
 window.addEventListener("mousemove", (e) => {
   mouse.x = e.clientX;
   mouse.y = e.clientY;
+  
+  // Ghost tooltip check: hide tooltip if cursor is not over any active slot
+  const tooltip = document.getElementById("item-tooltip");
+  if (tooltip && !tooltip.classList.contains("hidden")) {
+    const targetSlot = e.target.closest(".inv-slot");
+    if (!targetSlot) {
+      hideTooltip();
+    }
+  }
 });
+
+window.addEventListener("touchmove", (e) => {
+  if (e.touches && e.touches.length > 0) {
+    const tooltip = document.getElementById("item-tooltip");
+    if (tooltip && !tooltip.classList.contains("hidden")) {
+      const touch = e.touches[0];
+      const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetSlot = targetEl ? targetEl.closest(".inv-slot") : null;
+      if (!targetSlot) {
+        hideTooltip();
+      }
+    }
+  }
+}, { passive: true });
 window.addEventListener("mousedown", (e) => {
   const invModal = document.getElementById("inventory-modal");
   const isInvOpen = invModal && !invModal.classList.contains("hidden");
@@ -1201,10 +1224,9 @@ function initLevel(name, charClass, newPlayer) {
   if (hudName) hudName.innerText = player.name;
   if (hudClass) hudClass.innerText = player.charClass.toUpperCase();
   
-  const avatarEl = document.getElementById("hud-avatar-icon");
-  if (avatarEl) {
-    const classData = Player.CLASSES[player.charClass] || Player.CLASSES.warrior;
-    avatarEl.innerText = classData.avatar || "👤";
+  // Initialize and load Lucide SVG icons in the HUD
+  if (window.initializeHudIcons) {
+    window.initializeHudIcons();
   }
   
   const floorHUD = document.getElementById("hud-floor");
@@ -1720,12 +1742,16 @@ function update(deltaTime) {
   }
 
   const combatStatus = document.getElementById("hud-combat-status");
-  if (combatStatus) {
+  const combatIcon = document.getElementById("hud-combat-icon");
+  const combatText = document.getElementById("hud-combat-text");
+  if (combatStatus && combatIcon && combatText) {
     if (player.combatTimer > 0) {
-      combatStatus.innerText = "⚔️ EN COMBATE";
+      combatIcon.innerHTML = window.InventoryIcons ? window.InventoryIcons.getIconSvg("sword", "#e74c3c", 14) : "";
+      combatText.innerText = "EN COMBATE";
       combatStatus.className = "combat-status-in";
     } else {
-      combatStatus.innerText = "🛡️ LIBRE";
+      combatIcon.innerHTML = window.InventoryIcons ? window.InventoryIcons.getIconSvg("shield", "#2ecc71", 14) : "";
+      combatText.innerText = "LIBRE";
       combatStatus.className = "combat-status-out";
     }
   }
@@ -1774,14 +1800,13 @@ function draw() {
   // 1. Draw flat ground items (potions, coins, etc.) first (so entities walk over them)
   for (let it of droppedItems) {
     if (it.type !== "gold_chest") {
-      ctx.fillStyle = it.color || "#fff";
-      ctx.beginPath();
       let isEquip = it.slot ||
                    (it.type === "weapon" || it.type === "rare_weapon" || it.type === "super_rare_weapon" || it.type === "STAFF_BLUE" || it.type === "GREATSWORD_FROST" || it.type.startsWith("eq_"));
       
+      let rx = it.x - camera.x;
+      let ry = it.y - camera.y;
+
       if (isEquip) {
-        let rx = it.x - camera.x;
-        let ry = it.y - camera.y;
         ctx.fillStyle = it.color || "#95a5a6";
         ctx.fillRect(rx - it.radius, ry - it.radius, it.radius * 2, it.radius * 2);
         
@@ -1821,27 +1846,27 @@ function draw() {
         }
         
         // Draw icon centered if available
-        if (it.icon) {
-          ctx.fillStyle = "#fff";
-          ctx.font = `${Math.floor(it.radius * 1.3)}px sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(it.icon, rx, ry);
+        let iconName = window.InventoryIcons.getIconName(it);
+        let imgSize = Math.floor(it.radius * 1.4);
+        let img = window.InventoryIcons.getCachedIconImage(iconName, "#ffffff", imgSize);
+        if (img) {
+          ctx.drawImage(img, rx - img.width / 2, ry - img.height / 2);
         }
       } else {
-        let rx = it.x - camera.x;
-        let ry = it.y - camera.y;
-        ctx.arc(rx, ry, it.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "#fff";
-        ctx.stroke();
-
-        if (it.icon) {
-          ctx.fillStyle = "#fff";
-          ctx.font = `${Math.floor(it.radius * 1.3)}px sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(it.icon, rx, ry);
+        let iconName = window.InventoryIcons.getIconName(it);
+        let iconColor = it.color || "#ffffff";
+        let imgSize = Math.floor(it.radius * 1.5);
+        let img = window.InventoryIcons.getCachedIconImage(iconName, iconColor, imgSize);
+        
+        if (img) {
+          ctx.drawImage(img, rx - img.width / 2, ry - img.height / 2);
+        } else {
+          ctx.beginPath();
+          ctx.arc(rx, ry, it.radius, 0, Math.PI * 2);
+          ctx.fillStyle = iconColor;
+          ctx.fill();
+          ctx.strokeStyle = "#fff";
+          ctx.stroke();
         }
       }
     }
@@ -1895,11 +1920,13 @@ function draw() {
   }
 
   // 2. Aggregate all Y-sorted entities
+  // 2. Aggregate all Y-sorted entities
   let ySortedEntities = [];
 
   if (player) {
     ySortedEntities.push({
       y: player.y,
+      height: player.height,
       draw: () => player.draw(ctx, camera)
     });
   }
@@ -1907,6 +1934,7 @@ function draw() {
   for (let e of enemies) {
     ySortedEntities.push({
       y: e.y,
+      height: e.height,
       draw: () => e.draw(ctx, camera)
     });
   }
@@ -1915,6 +1943,7 @@ function draw() {
     for (let npc of safeRoomNPCs) {
       ySortedEntities.push({
         y: npc.y,
+        height: npc.height,
         draw: () => drawSafeRoomNPC(ctx, camera, npc)
       });
     }
@@ -1923,6 +1952,7 @@ function draw() {
   if (merchantNPC) {
     ySortedEntities.push({
       y: merchantNPC.y,
+      height: merchantNPC.height,
       draw: () => drawMerchantNPC(ctx, camera, merchantNPC)
     });
   }
@@ -1931,13 +1961,16 @@ function draw() {
     if (it.type === "gold_chest") {
       ySortedEntities.push({
         y: it.y,
+        height: 20,
         draw: () => drawGoldChest(ctx, camera, it)
       });
     }
   }
 
-  // Sort entities by their Y coordinate
-  ySortedEntities.sort((a, b) => a.y - b.y);
+  // Sort entities by their vertical bottom (feet) coordinate
+  ySortedEntities.sort((a, b) => {
+    return (a.y + (a.height || 0)) - (b.y + (b.height || 0));
+  });
 
   // Draw all sorted entities
   for (let ent of ySortedEntities) {
@@ -2298,20 +2331,39 @@ function updateInventoryUI() {
 
       const eqItem = player.equipment[slot];
       if (eqItem) {
-        el.style.backgroundColor = eqItem.color || "#34495e";
+        el.style.backgroundColor = "rgba(20, 20, 20, 0.6)";
         el.style.borderColor = eqItem.color || "#7f8c8d";
-        
-        let icon = eqItem.icon;
-        if (!icon) {
-          if (eqItem.type === "red_potion") icon = "🔴";
-          else if (eqItem.type === "blue_potion") icon = "🔵";
-          else if (eqItem.type === "weapon" || eqItem.type === "greatsword" || eqItem.type === "GREATSWORD_FROST") icon = "⚔️";
-          else if (eqItem.type === "rare_weapon" || eqItem.type === "STAFF_BLUE") icon = "🔮";
-          else if (eqItem.type === "super_rare_weapon") icon = "👑";
-          else if (eqItem.type === "heart" || eqItem.type === "reserve_heart") icon = "💖";
-          else icon = "🛡️";
+        el.style.boxShadow = `0 0 8px ${(eqItem.color || '#7f8c8d')}33`;
+        el.innerHTML = "...";
+
+        if (window.InventoryIcons) {
+          const iconName = window.InventoryIcons.getIconName(eqItem);
+          const itemColor = eqItem.color || "#bdc3c7";
+          const iconSize = 32;
+          
+          window.InventoryIcons.getIconImage(iconName, itemColor, iconSize)
+            .then((img) => {
+              if (player.equipment[slot] === eqItem) {
+                window.InventoryIcons.renderIconToSlot(el, img, iconSize);
+              }
+            })
+            .catch((err) => {
+              console.error("Failed loading equip icon:", err);
+              el.innerHTML = "❌";
+            });
+        } else {
+          let icon = eqItem.icon;
+          if (!icon) {
+            if (eqItem.type === "red_potion") icon = "🔴";
+            else if (eqItem.type === "blue_potion") icon = "🔵";
+            else if (eqItem.type === "weapon" || eqItem.type === "greatsword" || eqItem.type === "GREATSWORD_FROST") icon = "⚔️";
+            else if (eqItem.type === "rare_weapon" || eqItem.type === "STAFF_BLUE") icon = "🔮";
+            else if (eqItem.type === "super_rare_weapon") icon = "👑";
+            else if (eqItem.type === "heart" || eqItem.type === "reserve_heart") icon = "💖";
+            else icon = "🛡️";
+          }
+          el.innerHTML = icon;
         }
-        el.innerHTML = icon;
 
         let rarityKey = eqItem.rarity || "common";
         if (!eqItem.rarity) {
@@ -2338,20 +2390,36 @@ function updateInventoryUI() {
       } else {
         el.style.backgroundColor = "";
         el.style.borderColor = "";
+        el.style.boxShadow = "";
         
         let defaultEmoji = "";
+        let defaultIconName = "";
         switch (slot) {
-          case "head": defaultEmoji = "🪖"; break;
-          case "chest": defaultEmoji = "👕"; break;
-          case "legs": defaultEmoji = "👖"; break;
-          case "gloves": defaultEmoji = "🧤"; break;
-          case "ring": defaultEmoji = "💍"; break;
-          case "ring2": defaultEmoji = "💍"; break;
-          case "pendant": defaultEmoji = "📿"; break;
-          case "pendant2": defaultEmoji = "📿"; break;
-          case "weapon": defaultEmoji = player.charClass === "warrior" ? "⚔️" : "🔮"; break;
+          case "head": defaultEmoji = "🪖"; defaultIconName = "crown"; break;
+          case "chest": defaultEmoji = "👕"; defaultIconName = "shirt"; break;
+          case "legs": defaultEmoji = "👖"; defaultIconName = "shield"; break;
+          case "gloves": defaultEmoji = "🧤"; defaultIconName = "shield"; break;
+          case "ring": defaultEmoji = "💍"; defaultIconName = "gem"; break;
+          case "ring2": defaultEmoji = "💍"; defaultIconName = "gem"; break;
+          case "pendant": defaultEmoji = "📿"; defaultIconName = "gem"; break;
+          case "pendant2": defaultEmoji = "📿"; defaultIconName = "gem"; break;
+          case "weapon": 
+            defaultEmoji = player.charClass === "warrior" ? "⚔️" : "🔮"; 
+            defaultIconName = player.charClass === "warrior" ? "sword" : "wand";
+            break;
         }
-        el.innerHTML = defaultEmoji;
+
+        if (window.InventoryIcons) {
+          window.InventoryIcons.getIconImage(defaultIconName, "rgba(255, 255, 255, 0.15)", 28)
+            .then((img) => {
+              if (!player.equipment[slot]) {
+                window.InventoryIcons.renderIconToSlot(el, img, 28);
+              }
+            });
+        } else {
+          el.innerHTML = defaultEmoji;
+        }
+        
         el.className = "inv-slot eq-slot" + (slot === "weapon" ? " weapon-slot" : "");
 
         el.draggable = false;
@@ -2424,9 +2492,13 @@ function updateMaterialsUI() {
     
     let slot = document.createElement("div");
     slot.className = "inv-slot";
-    slot.style.backgroundColor = mat.color;
+    slot.style.backgroundColor = "rgba(20, 20, 20, 0.6)";
+    slot.style.border = `2px solid ${mat.color}`;
+    slot.style.boxShadow = `0 0 8px ${mat.color}33`;
     
-    slot.innerHTML = mat.icon;
+    let iconName = window.InventoryIcons.getIconName(mat);
+    let iconSvg = window.InventoryIcons.getIconSvg(iconName, "#ffffff", 28);
+    slot.innerHTML = iconSvg || mat.icon;
 
     if (qty > 0) {
       slot.style.opacity = "1";
@@ -2817,6 +2889,61 @@ function selectBackpackItem(index) {
 }
 window.selectBackpackItem = selectBackpackItem;
 
+function getPowerLucideIcon(powerId) {
+  const mapping = {
+    fire: "flame",
+    water: "droplets",
+    earth: "mountain",
+    wind: "wind",
+    double_strike: "sword",
+    charge: "sparkles",
+    knockback: "shield",
+    fury: "sparkles"
+  };
+  return mapping[powerId] || "sparkles";
+}
+
+function initializeHudIcons() {
+  if (!player || !window.InventoryIcons) return;
+
+  const hpIcon = document.getElementById("hud-hp-icon");
+  if (hpIcon) hpIcon.innerHTML = window.InventoryIcons.getIconSvg("heart", "#e74c3c", 16);
+
+  const manaIcon = document.getElementById("hud-mana-icon");
+  if (manaIcon) manaIcon.innerHTML = window.InventoryIcons.getIconSvg("droplet", "#3498db", 16);
+
+  const coinsIcon = document.getElementById("hud-coins-icon");
+  if (coinsIcon) coinsIcon.innerHTML = window.InventoryIcons.getIconSvg("coins", "#f1c40f", 16);
+
+  const shopCoinsIcon = document.getElementById("shop-coins-icon");
+  if (shopCoinsIcon) shopCoinsIcon.innerHTML = window.InventoryIcons.getIconSvg("coins", "#f1c40f", 16);
+
+  const backpackBtnIcon = document.getElementById("backpack-btn-icon");
+  if (backpackBtnIcon) backpackBtnIcon.innerHTML = window.InventoryIcons.getIconSvg("backpack", "#e1b1ff", 14);
+
+  const backpackModalIcon = document.getElementById("backpack-modal-icon");
+  if (backpackModalIcon) backpackModalIcon.innerHTML = window.InventoryIcons.getIconSvg("backpack", "#8e44ad", 20);
+
+  const avatarIcon = document.getElementById("hud-avatar-icon");
+  if (avatarIcon) {
+    const iconKey = player.charClass === "warrior" ? "sword" : "wand";
+    const iconColor = player.charClass === "warrior" ? "#e74c3c" : "#3498db";
+    avatarIcon.innerHTML = window.InventoryIcons.getIconSvg(iconKey, iconColor, 28);
+  }
+
+  const fullscreenBtn = document.getElementById("fullscreen-btn");
+  if (fullscreenBtn) {
+    fullscreenBtn.innerHTML = window.InventoryIcons.getIconSvg("settings", "#bdc3c7", 12) + " Fullscreen";
+  }
+
+  const attackBtn = document.getElementById("btn-attack");
+  if (attackBtn) {
+    const iconKey = player.charClass === "warrior" ? "sword" : "wand";
+    attackBtn.innerHTML = window.InventoryIcons.getIconSvg(iconKey, "#f1c40f", 28);
+  }
+}
+window.initializeHudIcons = initializeHudIcons;
+
 function updatePowerBarUI() {
   let hudPowerBar = document.getElementById("power-bar");
   if (!hudPowerBar) return;
@@ -2830,14 +2957,16 @@ function updatePowerBarUI() {
     if (power) {
       slot.style.backgroundColor = power.color;
 
-      // Inject icon (emoji)
-      let pIcon = getPowerIcon(power);
-      if (pIcon) {
-        let iconSpan = document.createElement("span");
-        iconSpan.className = "power-icon";
-        iconSpan.innerText = pIcon;
-        slot.appendChild(iconSpan);
+      // Inject icon (SVG)
+      let lucideKey = getPowerLucideIcon(power.id);
+      let iconSpan = document.createElement("span");
+      iconSpan.className = "power-icon hud-icon";
+      if (window.InventoryIcons) {
+        iconSpan.innerHTML = window.InventoryIcons.getIconSvg(lucideKey, "#fff", 18);
+      } else {
+        iconSpan.innerText = getPowerIcon(power);
       }
+      slot.appendChild(iconSpan);
 
       if (power.level > 1) {
         let lvLabel = document.createElement("span");
@@ -2860,8 +2989,12 @@ function updatePowerBarUI() {
       if (player && i < player.powers.length) {
         let p = player.powers[i];
         mobileBtn.style.backgroundColor = p.color;
-        let pIcon = getPowerIcon(p);
-        mobileBtn.innerText = pIcon || p.name[0]; // Display icon or first letter
+        let lucideKey = getPowerLucideIcon(p.id);
+        if (window.InventoryIcons) {
+          mobileBtn.innerHTML = window.InventoryIcons.getIconSvg(lucideKey, "#fff", 20);
+        } else {
+          mobileBtn.innerText = getPowerIcon(p) || p.name[0];
+        }
         mobileBtn.style.opacity = "1";
         mobileBtn.style.pointerEvents = "auto";
         if (i === player.activePowerIndex) {
@@ -2928,10 +3061,13 @@ function showRewardScreen() {
   choices.forEach((power) => {
     let card = document.createElement("div");
     card.className = "reward-card";
-    let pIcon = getPowerIcon(power);
-    let displayTitle = pIcon ? `${pIcon} ${power.name}` : power.name;
+    let lucideKey = getPowerLucideIcon(power.id);
+    let iconSvg = window.InventoryIcons ? window.InventoryIcons.getIconSvg(lucideKey, power.color, 24) : "";
     card.innerHTML = `
-      <h3 style="color:${power.color}">${displayTitle}</h3>
+      <div style="display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 8px;">
+        ${iconSvg}
+        <h3 style="color:${power.color}; margin: 0;">${power.name}</h3>
+      </div>
       <p>${power.desc}</p>
     `;
     card.onclick = () => selectPower(power);
@@ -3321,16 +3457,21 @@ function updateShopUI() {
       } else if (item.type === "rare_weapon") rarityClass = "rarity-rare";
       else if (item.type === "super_rare_weapon") rarityClass = "rarity-legendary";
       
+      let iconName = window.InventoryIcons.getIconName(item);
+      let iconColor = item.color || "#ffffff";
+      let iconSvg = window.InventoryIcons.getIconSvg(iconName, iconColor, 28);
+      let coinSvg = window.InventoryIcons.getIconSvg("coins", "#f1c40f", 14);
+
       div.innerHTML = `
         <div class="shop-item-info">
-          <div class="shop-item-icon">${item.icon}</div>
+          <div class="shop-item-icon" style="display: flex; align-items: center; justify-content: center;">${iconSvg || item.icon}</div>
           <div class="shop-item-details">
             <span class="shop-item-name ${rarityClass}">${item.name}</span>
             <span class="shop-item-desc">${item.desc}</span>
           </div>
         </div>
         <div class="shop-item-action">
-          <span class="shop-item-price">🪙 ${item.price}</span>
+          <span class="shop-item-price" style="display: inline-flex; align-items: center; gap: 4px;">${coinSvg} ${item.price}</span>
           <button type="button" class="shop-item-btn" onclick="buyShopItem(${index})">Comprar</button>
         </div>
       `;
@@ -3349,17 +3490,6 @@ function updateShopUI() {
         div.className = "shop-item";
         
         let sellPrice = getItemSellValue(item);
-        let iconStr = item.icon || "📦";
-        if (!item.icon) {
-          if (item.type === "red_potion") iconStr = "🔴";
-          else if (item.type === "blue_potion") iconStr = "🔵";
-          else if (item.type === "weapon") iconStr = "⚔️";
-          else if (item.type === "rare_weapon") iconStr = "🔮";
-          else if (item.type === "super_rare_weapon") iconStr = "👑";
-          else if (item.type === "heart" || item.type === "reserve_heart") iconStr = "💖";
-          else if (item.type === "upgrade_scroll") iconStr = "📜";
-          else if (item.type === "armor_scroll") iconStr = "🛡️";
-        }
         
         let rarityClass = "rarity-common";
         if (item.rarity) {
@@ -3376,16 +3506,21 @@ function updateShopUI() {
           rarityClass = "rarity-mythic";
         }
         
+        let iconName = window.InventoryIcons.getIconName(item);
+        let iconColor = item.color || "#ffffff";
+        let iconSvg = window.InventoryIcons.getIconSvg(iconName, iconColor, 28);
+        let coinSvg = window.InventoryIcons.getIconSvg("coins", "#f1c40f", 14);
+
         div.innerHTML = `
           <div class="shop-item-info">
-            <div class="shop-item-icon">${iconStr}</div>
+            <div class="shop-item-icon" style="display: flex; align-items: center; justify-content: center;">${iconSvg}</div>
             <div class="shop-item-details">
               <span class="shop-item-name ${rarityClass}">${item.name}</span>
               <span class="shop-item-desc">${item.bonus ? '+' + Math.round(item.bonus*100) + '% dmg' : (item.desc || 'Objeto de aventura')}</span>
             </div>
           </div>
           <div class="shop-item-action">
-            <span class="shop-item-price">🪙 ${sellPrice}</span>
+            <span class="shop-item-price" style="display: inline-flex; align-items: center; gap: 4px;">${coinSvg} ${sellPrice}</span>
             <button type="button" class="shop-item-btn" style="background: #c0392b;" onclick="sellShopItem(${index})">Vender</button>
           </div>
         `;

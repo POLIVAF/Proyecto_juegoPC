@@ -30,6 +30,11 @@ class Enemy {
             this.color = '#2980b9'; // Blue
         }
         
+        // Balance floor 2 mobs speed (30% reduction)
+        if (floor === 2) {
+            this.speed *= 0.70;
+        }
+        
         // 10% chance to be an Elite enemy
         this.isElite = Math.random() < 0.10;
         if (this.isElite) {
