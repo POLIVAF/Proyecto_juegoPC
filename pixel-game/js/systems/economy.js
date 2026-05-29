@@ -86,6 +86,7 @@ function getItemSellValue(item) {
   else if (rarity === "very_rare") baseVal = 30;
   else if (rarity === "epic") baseVal = 50;
   else if (rarity === "legendary") baseVal = 100;
+  else if (rarity === "mythic") baseVal = 200;
 
   // Add floor scaling
   let finalVal = baseVal + scaleFloor * Math.floor(baseVal * 0.1);

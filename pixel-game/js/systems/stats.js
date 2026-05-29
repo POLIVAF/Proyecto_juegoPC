@@ -4,6 +4,7 @@ function generateProceduralStats(slot, rarity, floor) {
   else if (rarity === "very_rare") numStats = 3;
   else if (rarity === "epic") numStats = 4;
   else if (rarity === "legendary") numStats = 5;
+  else if (rarity === "mythic") numStats = 6;
 
   let stats = {};
   let pool = [];

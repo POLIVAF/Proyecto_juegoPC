@@ -22,6 +22,10 @@ function generateClassWeapon(rarity, floor, charClass) {
     multiplier = 2.7;
     color = "#f1c40f";
     type = "super_rare_weapon";
+  } else if (rarity === "mythic") {
+    multiplier = 3.5;
+    color = "#ff5500";
+    type = "mythic_weapon";
   }
 
   let finalBonus = baseBonus * multiplier;
@@ -33,7 +37,8 @@ function generateClassWeapon(rarity, floor, charClass) {
       rare: "Mandoble del Héroe",
       very_rare: "Filo Siniestro",
       epic: "Mandoble de Obsidiana",
-      legendary: "Filo Celestial"
+      legendary: "Filo Celestial",
+      mythic: "Segadora del Inframundo"
     };
     name = `${prefixes[rarity]} +${floor}`;
   } else {
@@ -42,7 +47,8 @@ function generateClassWeapon(rarity, floor, charClass) {
       rare: "Bastón Místico",
       very_rare: "Bastón del Ocaso",
       epic: "Cetro Arcano",
-      legendary: "Báculo del Caos"
+      legendary: "Báculo del Caos",
+      mythic: "Báculo de la Singularidad"
     };
     name = `${prefixes[rarity]} +${floor}`;
   }
@@ -66,9 +72,9 @@ function generateClassWeapon(rarity, floor, charClass) {
   };
 }
 
-function generateRandomEquipment(floor, forcedRarity = null) {
+function generateRandomEquipment(floor, forcedRarity = null, forcedSlot = null) {
   let slots = ["head", "chest", "legs", "gloves", "ring", "pendant"];
-  let slot = slots[Math.floor(Math.random() * slots.length)];
+  let slot = forcedSlot || slots[Math.floor(Math.random() * slots.length)];
 
   if (slot === "ring" || slot === "pendant") {
     return generateRandomAccessory(slot, floor, forcedRarity);
@@ -107,6 +113,7 @@ function generateRandomEquipment(floor, forcedRarity = null) {
   else if (rarity === "very_rare") multiplier = 1.7;
   else if (rarity === "epic") multiplier = 2.1;
   else if (rarity === "legendary") multiplier = 2.7;
+  else if (rarity === "mythic") multiplier = 3.5;
 
   let finalBonus = baseBonusVal * multiplier;
   let stats = generateProceduralStats(slot, rarity, floor);
@@ -132,6 +139,9 @@ function generateRandomAccessory(slot, floor, forcedRarity = null) {
   let color = getRarityColor(rarity);
 
   let suffixes = ["de Furia", "de Acero", "Celestial", "Místico", "de las Sombras", "de la Luz", "Sagrado", "Rúnico", "del Titán", "de Vitalidad", "de Fuego", "de Escarcha", "del Fénix", "del Dragón"];
+  if (rarity === "mythic") {
+    suffixes = ["de la Eternidad", "del Vacío", "del Inframundo", "Divino", "Cosmocreador"];
+  }
   let suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
   let noun = slot === "ring" ? "Anillo" : "Colgante";
   let name = `${noun} ${suffix}`;

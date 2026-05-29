@@ -54,6 +54,8 @@ let floatingTexts = [];
 let safeRoomNPCs = [];
 let activeDialogNPC = null;
 let activeDialogTimer = 0;
+let selectedBackpackIndex = -1;
+let tooltipTimeout = null;
 
 function addFloatingText(text, x, y, color = "#f1c40f") {
   floatingTexts.push({
@@ -66,6 +68,69 @@ function addFloatingText(text, x, y, color = "#f1c40f") {
     color: color
   });
 }
+
+function rectsOverlap(x1, y1, w1, h1, x2, y2, w2, h2) {
+  return (Math.abs(x1 - x2) < (w1 + w2) / 2 &&
+          Math.abs(y1 - y2) < (h1 + h2) / 2);
+}
+window.rectsOverlap = rectsOverlap;
+
+function isSolidAt(x, y, w, h, ignoreEntity) {
+  // 1. Wall check
+  if (dungeon && dungeon.isWallRect) {
+    if (dungeon.isWallRect(x, y, w, h)) {
+      return true;
+    }
+  }
+  
+  // 2. Merchant NPC check
+  if (merchantNPC && ignoreEntity !== merchantNPC) {
+    if (rectsOverlap(x, y, w, h, merchantNPC.x, merchantNPC.y, merchantNPC.width, merchantNPC.height)) {
+      return true;
+    }
+  }
+  
+  // 3. Safe Room NPCs check
+  if (safeRoomNPCs) {
+    for (let npc of safeRoomNPCs) {
+      if (ignoreEntity !== npc) {
+        if (rectsOverlap(x, y, w, h, npc.x, npc.y, npc.width, npc.height)) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  // 4. Gold Chests check
+  if (droppedItems) {
+    for (let it of droppedItems) {
+      if (it.type === "gold_chest" && ignoreEntity !== it) {
+        if (rectsOverlap(x, y, w, h, it.x, it.y, 24, 20)) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  // 5. Player check
+  if (player && ignoreEntity !== player) {
+    if (rectsOverlap(x, y, w, h, player.x, player.y, player.width, player.height)) {
+      return true;
+    }
+  }
+  
+  // 6. Enemies check
+  if (ignoreEntity === player && enemies) {
+    for (let e of enemies) {
+      if (rectsOverlap(x, y, w, h, e.x, e.y, e.width, e.height)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+window.isSolidAt = isSolidAt;
 
 function getRoomAt(x, y) {
   if (!dungeon || !dungeon.rooms) return null;
@@ -221,6 +286,11 @@ function showTooltip(item, event) {
   const tooltip = document.getElementById("item-tooltip");
   if (!tooltip || !item) return;
 
+  if (tooltipTimeout) {
+    clearTimeout(tooltipTimeout);
+    tooltipTimeout = null;
+  }
+
   const nameEl = tooltip.querySelector(".tooltip-name");
   const rarityEl = tooltip.querySelector(".tooltip-rarity");
   const statsEl = tooltip.querySelector(".tooltip-stats");
@@ -230,7 +300,9 @@ function showTooltip(item, event) {
 
   let rarityKey = item.rarity || "common";
   if (!item.rarity) {
-    if (item.color === "#f1c40f") rarityKey = "legendary";
+    if (item.color === "#ff5500") rarityKey = "mythic";
+    else if (item.color === "#f1c40f") rarityKey = "legendary";
+    else if (item.color === "#e67e22") rarityKey = "epic";
     else if (item.color === "#9b59b6") rarityKey = "very_rare";
     else if (item.color === "#3498db") rarityKey = "rare";
   }
@@ -240,7 +312,8 @@ function showTooltip(item, event) {
     rare: "Raro",
     very_rare: "Muy Raro",
     epic: "Épico",
-    legendary: "Legendario"
+    legendary: "Legendario",
+    mythic: "Mítica"
   };
   rarityEl.innerText = rarityLabels[rarityKey] || "Común";
   rarityEl.className = "tooltip-rarity rarity-" + rarityKey;
@@ -272,6 +345,10 @@ function showTooltip(item, event) {
 
   tooltip.classList.remove("hidden");
   positionTooltip(event);
+
+  tooltipTimeout = setTimeout(() => {
+    hideTooltip();
+  }, 3000);
 }
 
 function positionTooltip(event) {
@@ -303,6 +380,10 @@ function positionTooltip(event) {
 }
 
 function hideTooltip() {
+  if (tooltipTimeout) {
+    clearTimeout(tooltipTimeout);
+    tooltipTimeout = null;
+  }
   const tooltip = document.getElementById("item-tooltip");
   if (tooltip) {
     tooltip.classList.add("hidden");
@@ -334,7 +415,7 @@ function isSlotCompatible(item, slot) {
   
   let itemSlot = item.slot;
   if (!itemSlot) {
-    if (item.type === "weapon" || item.type === "rare_weapon" || item.type === "super_rare_weapon" || item.type === "STAFF_BLUE" || item.type === "GREATSWORD_FROST") {
+    if (item.type === "weapon" || item.type === "rare_weapon" || item.type === "very_rare_weapon" || item.type === "epic_weapon" || item.type === "super_rare_weapon" || item.type === "mythic_weapon" || item.type === "STAFF_BLUE" || item.type === "GREATSWORD_FROST") {
       itemSlot = "weapon";
     } else if (item.type.startsWith("eq_")) {
       itemSlot = item.type.replace("eq_", "");
@@ -384,14 +465,19 @@ function handleDrop(e, targetType, targetValue) {
       return;
     }
     
-    if (targetType === "drop_zone") {
+    if (targetType === "drop_zone" || targetType === "delete_zone") {
+      let isDelete = (targetType === "delete_zone");
       if (srcType === "backpack") {
         let itemIndex = parseInt(srcVal);
         let item = player.inventory[itemIndex];
         if (!item) return;
         player.inventory.splice(itemIndex, 1);
-        spawnDroppedItem(item);
-        addFloatingText("Soltado: " + item.name, player.x, player.y - 20, item.color || "#fff");
+        if (isDelete) {
+          addFloatingText("Eliminado: " + item.name, player.x, player.y - 20, "#e74c3c");
+        } else {
+          spawnDroppedItem(item);
+          addFloatingText("Soltado: " + item.name, player.x, player.y - 20, item.color || "#fff");
+        }
         updateInventoryUI();
         saveGame();
       } else if (srcType === "equipped") {
@@ -399,9 +485,13 @@ function handleDrop(e, targetType, targetValue) {
         let item = player.equipment[slot];
         if (!item) return;
         player.equipment[slot] = null;
-        spawnDroppedItem(item);
+        if (isDelete) {
+          addFloatingText("Eliminado: " + item.name, player.x, player.y - 20, "#e74c3c");
+        } else {
+          spawnDroppedItem(item);
+          addFloatingText("Soltado: " + item.name, player.x, player.y - 20, item.color || "#fff");
+        }
         player.damage = player.getDamage();
-        addFloatingText("Soltado: " + item.name, player.x, player.y - 20, item.color || "#fff");
         updateInventoryUI();
         saveGame();
       }
@@ -546,6 +636,9 @@ function resize() {
   checkOrientation();
 }
 window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", () => {
+  setTimeout(resize, 200);
+});
 resize();
 
 // Input
@@ -626,8 +719,8 @@ window.addEventListener("mousedown", (e) => {
       return; 
     }
     
-    // Check if we clicked on an NPC first
-    let hit = checkNPCClick(e.clientX, e.clientY);
+    // Check if we clicked on an NPC, item, or active interactable first
+    let hit = checkInteractableClick(e.clientX, e.clientY) || checkNPCClick(e.clientX, e.clientY) || checkItemClick(e.clientX, e.clientY);
     if (hit) {
       mouse.clicked = false;
       return;
@@ -645,9 +738,9 @@ window.addEventListener("touchstart", (e) => {
       return; 
     }
     let touch = e.touches[0];
-    let hit = checkNPCClick(touch.clientX, touch.clientY);
+    let hit = checkInteractableClick(touch.clientX, touch.clientY) || checkNPCClick(touch.clientX, touch.clientY) || checkItemClick(touch.clientX, touch.clientY);
     if (hit) {
-      // Prevent other actions if we hit an NPC
+      // Prevent other actions if we hit an NPC or item
       e.preventDefault();
     }
   }
@@ -666,9 +759,6 @@ if (characterForm) {
     
     const classSelected = document.querySelector('input[name="char-class"]:checked');
     const charClass = classSelected ? classSelected.value : "warrior";
-    
-    const genderSelected = document.querySelector('input[name="char-gender"]:checked');
-    const gender = genderSelected ? genderSelected.value : "male";
 
     console.log("Iniciando aventura...");
     currentSaveSlot = 1;
@@ -676,7 +766,7 @@ if (characterForm) {
     // Entrar en modo pantalla completa
     enterFullscreen();
     
-    startGame(name, charClass, gender, 1, [], null, true);
+    startGame(name, charClass, 1, [], null, true);
   });
 }
 
@@ -690,7 +780,7 @@ if (continueBtn) {
       // Entrar en modo pantalla completa
       enterFullscreen();
       
-      startGame(data.name, data.charClass, data.gender, data.floor || 1, data.powers || [], data.hp, false);
+      startGame(data.name, data.charClass, data.floor || 1, data.powers || [], data.hp, false);
     }
   });
 }
@@ -783,7 +873,7 @@ if (restartBtn) {
     droppedItems = [];
 
     // Load the current floor
-    initLevel(player.name, player.charClass, player.gender, false);
+    initLevel(player.name, player.charClass, false);
 
     // Save game state
     saveGame();
@@ -808,7 +898,7 @@ if (restartBtn) {
   });
 }
 
-function startGame(name, charClass, gender, startFloor, powers, hp, newPlayer) {
+function startGame(name, charClass, startFloor, powers, hp, newPlayer) {
   if (mainMenu) mainMenu.classList.add("hidden");
   if (gameUi) gameUi.classList.remove("hidden");
   if (canvas) {
@@ -834,7 +924,7 @@ function startGame(name, charClass, gender, startFloor, powers, hp, newPlayer) {
     killedEnemiesCount = 0;
   }
   
-  initLevel(name, charClass, gender, newPlayer);
+  initLevel(name, charClass, newPlayer);
 
   if (!newPlayer && player) {
     player.powers = powers || [];
@@ -942,7 +1032,6 @@ function saveGame() {
   const data = {
     name: player.name,
     charClass: player.charClass,
-    gender: player.gender,
     maxHp: player.maxHp,
     hp: player.hp,
     maxMana: player.maxMana,
@@ -974,13 +1063,15 @@ function saveGame() {
 
 function findSafeEnemySpawnPosition(room, dungeon, player, enemyType) {
   let tileSize = dungeon.tileSize;
-  let minDistance = 3 * tileSize; // 120 pixels
+  let minDistance = 6 * tileSize; // 240 pixels (further from player spawn zone)
   let maxAttempts = 100;
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     let currentMinDist = minDistance;
-    if (attempt > 50) {
-      currentMinDist = 2 * tileSize; // 80 pixels
+    if (attempt > 60) {
+      currentMinDist = 3 * tileSize; // 120 pixels fallback
+    } else if (attempt > 30) {
+      currentMinDist = 4.5 * tileSize; // 180 pixels fallback
     }
     
     let ex = room.x * tileSize + 20 + Math.random() * (room.w * tileSize - 40);
@@ -1026,7 +1117,8 @@ function findSafeEnemySpawnPosition(room, dungeon, player, enemyType) {
   return { x: ex, y: ey };
 }
 
-function initLevel(name, charClass, gender, newPlayer) {
+function initLevel(name, charClass, newPlayer) {
+  hideTooltip();
   dungeon = new Dungeon(50, 50);
   dungeon.floor = floor;
   
@@ -1067,13 +1159,33 @@ function initLevel(name, charClass, gender, newPlayer) {
     }
   }
 
+  // Ensure the spawn position is not solid to prevent getting stuck in walls/NPCs
+  let checkSolid = window.isSolidAt || ((x, y, w, h) => dungeon && dungeon.isWallRect(x, y, w, h));
+  let pW = player ? player.width : 24;
+  let pH = player ? player.height : 24;
+  if (checkSolid(startX, startY, pW, pH)) {
+    let found = false;
+    for (let tx = startRoom.x; tx < startRoom.x + startRoom.w; tx++) {
+      for (let ty = startRoom.y; ty < startRoom.y + startRoom.h; ty++) {
+        let px = tx * dungeon.tileSize + dungeon.tileSize / 2;
+        let py = ty * dungeon.tileSize + dungeon.tileSize / 2;
+        if (!checkSolid(px, py, pW, pH)) {
+          startX = px;
+          startY = py;
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+  }
+
   if (newPlayer || !player) {
-    player = new Player(startX, startY, name, charClass, gender);
+    player = new Player(startX, startY, name, charClass);
   } else {
     player.x = startX;
     player.y = startY;
     player.projectiles = [];
-    player.immunityTimer = 0;
     player.poisonTimer = 0;
     player.stunTimer = 0;
     player.stunImmunityTimer = 0;
@@ -1082,6 +1194,9 @@ function initLevel(name, charClass, gender, newPlayer) {
     player.lastDamageTimer = 0;
     player.stillTimer = 0;
   }
+  
+  // 180 frames (3 seconds) of spawn/respawn protection
+  player.immunityTimer = 180;
 
   if (hudName) hudName.innerText = player.name;
   if (hudClass) hudClass.innerText = player.charClass.toUpperCase();
@@ -1367,15 +1482,7 @@ function update(deltaTime) {
     }
   }
 
-  // Show/Hide mobile interact button
-  const btnInteract = document.getElementById("btn-interact");
-  if (btnInteract) {
-    if (currentInteractable) {
-      btnInteract.classList.remove("hidden");
-    } else {
-      btnInteract.classList.add("hidden");
-    }
-  }
+
 
   // Camera follow player
   camera.x = player.x - camera.width / 2;
@@ -1496,19 +1603,19 @@ function update(deltaTime) {
         
         let nextE2X = e2.x + pushX;
         let nextE2Y = e2.y + pushY;
-        if (dungeon && !dungeon.isWallRect(nextE2X, e2.y, e2.width, e2.height)) {
+        if (!isSolidAt(nextE2X, e2.y, e2.width, e2.height, e2)) {
           e2.x = nextE2X;
         }
-        if (dungeon && !dungeon.isWallRect(e2.x, nextE2Y, e2.width, e2.height)) {
+        if (!isSolidAt(e2.x, nextE2Y, e2.width, e2.height, e2)) {
           e2.y = nextE2Y;
         }
         
         let nextE1X = e1.x - pushX;
         let nextE1Y = e1.y - pushY;
-        if (dungeon && !dungeon.isWallRect(nextE1X, e1.y, e1.width, e1.height)) {
+        if (!isSolidAt(nextE1X, e1.y, e1.width, e1.height, e1)) {
           e1.x = nextE1X;
         }
-        if (dungeon && !dungeon.isWallRect(e1.x, nextE1Y, e1.width, e1.height)) {
+        if (!isSolidAt(e1.x, nextE1Y, e1.width, e1.height, e1)) {
           e1.y = nextE1Y;
         }
       }
@@ -1530,26 +1637,26 @@ function update(deltaTime) {
       }
       
       let overlap = minDist - dist;
-      let pushX = (dx / dist) * overlap;
-      let pushY = (dy / dist) * overlap;
+      let pushX = (dx / dist) * overlap * 0.5;
+      let pushY = (dy / dist) * overlap * 0.5;
       
       let nextEX = e.x + pushX;
       let nextEY = e.y + pushY;
-      if (dungeon && !dungeon.isWallRect(nextEX, e.y, e.width, e.height)) {
+      if (!isSolidAt(nextEX, e.y, e.width, e.height, e)) {
         e.x = nextEX;
       }
-      if (dungeon && !dungeon.isWallRect(e.x, nextEY, e.width, e.height)) {
+      if (!isSolidAt(e.x, nextEY, e.width, e.height, e)) {
         e.y = nextEY;
       }
       
-      let pushPlayerX = -(dx / dist) * overlap * 0.2;
-      let pushPlayerY = -(dy / dist) * overlap * 0.2;
+      let pushPlayerX = -pushX;
+      let pushPlayerY = -pushY;
       let nextPlayerX = player.x + pushPlayerX;
       let nextPlayerY = player.y + pushPlayerY;
-      if (dungeon && !dungeon.isWallRect(nextPlayerX, player.y, player.width, player.height)) {
+      if (!isSolidAt(nextPlayerX, player.y, player.width, player.height, player)) {
         player.x = nextPlayerX;
       }
-      if (dungeon && !dungeon.isWallRect(player.x, nextPlayerY, player.width, player.height)) {
+      if (!isSolidAt(player.x, nextPlayerY, player.width, player.height, player)) {
         player.y = nextPlayerY;
       }
     }
@@ -1583,54 +1690,6 @@ function update(deltaTime) {
     let it = droppedItems[i];
     if (it.pickupDelay > 0) {
       it.pickupDelay--;
-      continue;
-    }
-    let dx = player.x - it.x;
-    let dy = player.y - it.y;
-    if (Math.sqrt(dx * dx + dy * dy) < player.width / 2 + it.radius) {
-      if (it.type === "gold_chest") {
-        continue;
-      }
-      if (it.type === "coin") {
-        player.coins = (player.coins || 0) + it.value;
-        addFloatingText("+" + it.value + " 🪙", it.x, it.y, "#f1c40f");
-        playCoinSound();
-        droppedItems.splice(i, 1);
-        const hudCoins = document.getElementById("hud-coins");
-        if (hudCoins) hudCoins.innerText = player.coins;
-        console.log("Monedas de oro obtenidas: " + it.value + ". Total: " + player.coins);
-      } else {
-        if (it.type && it.type.startsWith("material_")) {
-          player.materials = player.materials || {};
-          player.materials[it.type] = (player.materials[it.type] || 0) + 1;
-          addFloatingText(it.name + " +1 📦", it.x, it.y, it.color || "#fff");
-          droppedItems.splice(i, 1);
-          updateInventoryUI();
-          saveGame();
-        } else {
-          // Pick up item if backpack is not full
-          if (player.inventory.length < 15) {
-            player.inventory.push({
-              type: it.type,
-              name: it.name,
-              rarity: it.rarity,
-              color: it.color,
-              bonus: it.bonus,
-              hpBonus: it.hpBonus,
-              healAmount: it.healAmount,
-              manaAmount: it.manaAmount,
-              slot: it.slot,
-              classRestriction: it.classRestriction,
-              icon: it.icon,
-              desc: it.desc,
-              stats: it.stats
-            });
-            addFloatingText(it.name, it.x, it.y, it.color || "#fff");
-            droppedItems.splice(i, 1);
-            updateInventoryUI();
-          }
-        }
-      }
     }
   }
 
@@ -1712,33 +1771,11 @@ function draw() {
 
   dungeon.draw(ctx, camera);
 
-  for (let e of enemies) {
-    e.draw(ctx, camera);
-  }
-
-  for (let ep of enemyProjectiles) {
-    ctx.fillStyle = ep.color;
-    ctx.beginPath();
-    ctx.arc(ep.x - camera.x, ep.y - camera.y, ep.radius, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Draw items on ground
+  // 1. Draw flat ground items (potions, coins, etc.) first (so entities walk over them)
   for (let it of droppedItems) {
-    ctx.fillStyle = it.color;
-    ctx.beginPath();
-    if (it.type === "gold_chest") {
-      let rx = it.x - camera.x;
-      let ry = it.y - camera.y;
-      ctx.fillStyle = "#d35400"; // Wood brown
-      ctx.fillRect(rx - 12, ry - 10, 24, 20);
-      ctx.fillStyle = "#f1c40f"; // Gold details
-      ctx.fillRect(rx - 12, ry - 10, 24, 4); // lid top
-      ctx.fillRect(rx - 2, ry - 2, 4, 6);   // lock
-      ctx.strokeStyle = "#7f8c8d";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(rx - 12, ry - 10, 24, 20);
-    } else {
+    if (it.type !== "gold_chest") {
+      ctx.fillStyle = it.color || "#fff";
+      ctx.beginPath();
       let isEquip = it.slot ||
                    (it.type === "weapon" || it.type === "rare_weapon" || it.type === "super_rare_weapon" || it.type === "STAFF_BLUE" || it.type === "GREATSWORD_FROST" || it.type.startsWith("eq_"));
       
@@ -1748,11 +1785,40 @@ function draw() {
         ctx.fillStyle = it.color || "#95a5a6";
         ctx.fillRect(rx - it.radius, ry - it.radius, it.radius * 2, it.radius * 2);
         
-        ctx.strokeStyle = (it.type === "super_rare_weapon" || (it.name && it.name.includes("Legendario"))) ? "#f1c40f" : 
-                          (it.type === "rare_weapon" || (it.name && it.name.includes("Raro"))) ? "#9b59b6" : "#fff";
-        ctx.lineWidth = 2;
+        let outlineColor = "#fff";
+        let strokeWidth = 2;
+        if (it.rarity === "mythic" || it.type === "mythic_weapon" || (it.name && it.name.includes("Mítica"))) {
+          outlineColor = "#ff5500";
+          strokeWidth = 3.5;
+        } else if (it.rarity === "legendary" || it.type === "super_rare_weapon" || (it.name && it.name.includes("Legendario"))) {
+          outlineColor = "#f1c40f";
+          strokeWidth = 2.5;
+        } else if (it.rarity === "epic" || it.type === "epic_weapon" || (it.name && it.name.includes("Épico"))) {
+          outlineColor = "#e67e22";
+          strokeWidth = 2;
+        } else if (it.rarity === "very_rare" || it.type === "very_rare_weapon" || (it.name && it.name.includes("Muy Raro"))) {
+          outlineColor = "#9b59b6";
+          strokeWidth = 2;
+        } else if (it.rarity === "rare" || it.type === "rare_weapon" || (it.name && it.name.includes("Raro"))) {
+          outlineColor = "#3498db";
+          strokeWidth = 2;
+        }
+
+        let hasGlow = (outlineColor === "#ff5500" || outlineColor === "#f1c40f");
+        if (hasGlow) {
+          ctx.save();
+          ctx.shadowColor = outlineColor;
+          ctx.shadowBlur = 8;
+        }
+
+        ctx.strokeStyle = outlineColor;
+        ctx.lineWidth = strokeWidth;
         ctx.strokeRect(rx - it.radius, ry - it.radius, it.radius * 2, it.radius * 2);
         ctx.lineWidth = 1;
+
+        if (hasGlow) {
+          ctx.restore();
+        }
         
         // Draw icon centered if available
         if (it.icon) {
@@ -1781,12 +1847,25 @@ function draw() {
     }
   }
 
-  // Draw Merchant NPC
-  if (merchantNPC) {
-    let mx = merchantNPC.x - camera.x;
-    let my = merchantNPC.y - camera.y;
+  // Helper functions for drawing Y-sorted entities inline
+  function drawGoldChest(ctx, camera, chest) {
+    let rx = chest.x - camera.x;
+    let ry = chest.y - camera.y;
+    ctx.fillStyle = "#d35400"; // Wood brown
+    ctx.fillRect(rx - 12, ry - 10, 24, 20);
+    ctx.fillStyle = "#f1c40f"; // Gold details
+    ctx.fillRect(rx - 12, ry - 10, 24, 4); // lid top
+    ctx.fillRect(rx - 2, ry - 2, 4, 6);   // lock
+    ctx.strokeStyle = "#7f8c8d";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(rx - 12, ry - 10, 24, 20);
+  }
+
+  function drawMerchantNPC(ctx, camera, merchant) {
+    let mx = merchant.x - camera.x;
+    let my = merchant.y - camera.y;
     ctx.fillStyle = "#8e44ad";
-    ctx.fillRect(mx - merchantNPC.width / 2, my - merchantNPC.height / 2, merchantNPC.width, merchantNPC.height);
+    ctx.fillRect(mx - merchant.width / 2, my - merchant.height / 2, merchant.width, merchant.height);
     
     ctx.fillStyle = '#fff';
     ctx.font = '16px sans-serif';
@@ -1815,10 +1894,63 @@ function draw() {
     ctx.fillRect(mx + 7, my + 6, 2, 2);
   }
 
-  // Draw safe room NPCs
-  drawSafeRoomNPCs(ctx, camera);
+  // 2. Aggregate all Y-sorted entities
+  let ySortedEntities = [];
 
-  player.draw(ctx, camera);
+  if (player) {
+    ySortedEntities.push({
+      y: player.y,
+      draw: () => player.draw(ctx, camera)
+    });
+  }
+
+  for (let e of enemies) {
+    ySortedEntities.push({
+      y: e.y,
+      draw: () => e.draw(ctx, camera)
+    });
+  }
+
+  if (safeRoomNPCs) {
+    for (let npc of safeRoomNPCs) {
+      ySortedEntities.push({
+        y: npc.y,
+        draw: () => drawSafeRoomNPC(ctx, camera, npc)
+      });
+    }
+  }
+
+  if (merchantNPC) {
+    ySortedEntities.push({
+      y: merchantNPC.y,
+      draw: () => drawMerchantNPC(ctx, camera, merchantNPC)
+    });
+  }
+
+  for (let it of droppedItems) {
+    if (it.type === "gold_chest") {
+      ySortedEntities.push({
+        y: it.y,
+        draw: () => drawGoldChest(ctx, camera, it)
+      });
+    }
+  }
+
+  // Sort entities by their Y coordinate
+  ySortedEntities.sort((a, b) => a.y - b.y);
+
+  // Draw all sorted entities
+  for (let ent of ySortedEntities) {
+    ent.draw();
+  }
+
+  // Draw flying enemy projectiles on top
+  for (let ep of enemyProjectiles) {
+    ctx.fillStyle = ep.color;
+    ctx.beginPath();
+    ctx.arc(ep.x - camera.x, ep.y - camera.y, ep.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // Draw Interaction Prompt above player's head
   if (currentInteractable && player) {
@@ -1952,6 +2084,7 @@ function startGameLoop() {
 }
 
 function gameOver() {
+  hideTooltip();
   if (player && player.reserveHearts && player.reserveHearts.length > 0) {
     player.reserveHearts.pop();
     player.hp = 100;
@@ -2008,6 +2141,7 @@ function closeInventory() {
     modal.classList.add("hidden");
   }
   hideTooltip();
+  selectBackpackItem(-1);
   
   // Clear inventory slots and remove DOM listeners/references to avoid memory leaks
   const bpGrid = document.getElementById("backpack-grid");
@@ -2048,6 +2182,7 @@ if (closeInventoryBtn) {
 
 function updateInventoryUI() {
   if (!player) return;
+  hideTooltip();
 
   const bpGrid = document.getElementById("backpack-grid");
   if (bpGrid) {
@@ -2057,6 +2192,9 @@ function updateInventoryUI() {
     for (let i = 0; i < 15; i++) {
       let slot = document.createElement("div");
       slot.className = "inv-slot";
+      if (i === selectedBackpackIndex && i < player.inventory.length) {
+        slot.classList.add("selected");
+      }
       slot.dataset.index = i;
 
       // Drag and drop target events for all slots (filled or empty)
@@ -2065,21 +2203,44 @@ function updateInventoryUI() {
 
       if (i < player.inventory.length) {
         let item = player.inventory[i];
-        slot.style.backgroundColor = item.color;
         
-        let icon = item.icon;
-        if (!icon) {
-          if (item.type === "red_potion") icon = "🔴";
-          else if (item.type === "blue_potion") icon = "🔵";
-          else if (item.type === "weapon") icon = "⚔️";
-          else if (item.type === "rare_weapon") icon = "🔮";
-          else if (item.type === "super_rare_weapon") icon = "👑";
-          else if (item.type === "heart" || item.type === "reserve_heart") icon = "💖";
-          else if (item.type === "upgrade_scroll") icon = "📜";
-          else if (item.type === "armor_scroll") icon = "🛡️";
-          else icon = "📦";
+        // Sleek premium slot background and border
+        slot.style.backgroundColor = "rgba(20, 20, 20, 0.6)";
+        slot.style.border = `2px solid ${item.color || '#7f8c8d'}`;
+        slot.style.boxShadow = `0 0 8px ${(item.color || '#7f8c8d')}33`;
+        slot.innerHTML = "...";
+
+        if (window.InventoryIcons) {
+          const iconName = window.InventoryIcons.getIconName(item);
+          const itemColor = item.color || "#bdc3c7";
+          const iconSize = 32;
+          
+          window.InventoryIcons.getIconImage(iconName, itemColor, iconSize)
+            .then((img) => {
+              if (slot.dataset.index == i) {
+                window.InventoryIcons.renderIconToSlot(slot, img, iconSize);
+              }
+            })
+            .catch((err) => {
+              console.error("Failed loading inventory icon:", err);
+              slot.innerHTML = "❌";
+            });
+        } else {
+          // Fallback if module not loaded yet
+          let icon = item.icon;
+          if (!icon) {
+            if (item.type === "red_potion") icon = "🔴";
+            else if (item.type === "blue_potion") icon = "🔵";
+            else if (item.type === "weapon") icon = "⚔️";
+            else if (item.type === "rare_weapon") icon = "🔮";
+            else if (item.type === "super_rare_weapon") icon = "👑";
+            else if (item.type === "heart" || item.type === "reserve_heart") icon = "💖";
+            else if (item.type === "upgrade_scroll") icon = "📜";
+            else if (item.type === "armor_scroll") icon = "🛡️";
+            else icon = "📦";
+          }
+          slot.innerHTML = icon;
         }
-        slot.innerHTML = icon;
 
         // Custom Tooltips mouse/touch events
         slot.onmouseenter = (e) => showTooltip(item, e);
@@ -2097,8 +2258,17 @@ function updateInventoryUI() {
         slot.onclick = (e) => {
           if (e && e.shiftKey) {
             dropItem(i);
+            selectBackpackItem(-1);
+          } else if (e && (e.ctrlKey || e.metaKey)) {
+            deleteItem(i);
+            selectBackpackItem(-1);
           } else {
-            useItem(i);
+            if (selectedBackpackIndex === i) {
+              useItem(i);
+              selectBackpackItem(-1);
+            } else {
+              selectBackpackItem(i);
+            }
           }
         };
       } else {
@@ -2145,7 +2315,8 @@ function updateInventoryUI() {
 
         let rarityKey = eqItem.rarity || "common";
         if (!eqItem.rarity) {
-          if (eqItem.color === "#f1c40f") rarityKey = "legendary";
+          if (eqItem.color === "#ff5500") rarityKey = "mythic";
+          else if (eqItem.color === "#f1c40f") rarityKey = "legendary";
           else if (eqItem.color === "#e67e22") rarityKey = "epic";
           else if (eqItem.color === "#9b59b6") rarityKey = "very_rare";
           else if (eqItem.color === "#3498db") rarityKey = "rare";
@@ -2212,11 +2383,27 @@ function updateInventoryUI() {
     };
   }
 
+  const deleteZone = document.getElementById("inv-delete-zone");
+  if (deleteZone) {
+    deleteZone.ondragover = (e) => {
+      e.preventDefault();
+      deleteZone.classList.add("dragover");
+    };
+    deleteZone.ondragleave = () => {
+      deleteZone.classList.remove("dragover");
+    };
+    deleteZone.ondrop = (e) => {
+      deleteZone.classList.remove("dragover");
+      handleDrop(e, "delete_zone", null);
+    };
+  }
+
   updateMaterialsUI();
 }
 
 function updateMaterialsUI() {
   if (!player) return;
+  hideTooltip();
 
   const mGrid = document.getElementById("materials-grid");
   if (!mGrid) return;
@@ -2316,10 +2503,43 @@ function setupInventoryTabs() {
   }
 }
 
+function setupInventoryActionButtons() {
+  const btnUse = document.getElementById("btn-action-use");
+  const btnDrop = document.getElementById("btn-action-drop");
+  const btnDelete = document.getElementById("btn-action-delete");
+
+  if (btnUse) {
+    btnUse.onclick = () => {
+      if (selectedBackpackIndex >= 0 && player && selectedBackpackIndex < player.inventory.length) {
+        useItem(selectedBackpackIndex);
+        selectBackpackItem(-1);
+      }
+    };
+  }
+
+  if (btnDrop) {
+    btnDrop.onclick = () => {
+      if (selectedBackpackIndex >= 0 && player && selectedBackpackIndex < player.inventory.length) {
+        dropItem(selectedBackpackIndex);
+        selectBackpackItem(-1);
+      }
+    };
+  }
+
+  if (btnDelete) {
+    btnDelete.onclick = () => {
+      if (selectedBackpackIndex >= 0 && player && selectedBackpackIndex < player.inventory.length) {
+        deleteItem(selectedBackpackIndex);
+        selectBackpackItem(-1);
+      }
+    };
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   setupInventoryTabs();
+  setupInventoryActionButtons();
 });
-setupInventoryTabs();
 
 function useItem(index) {
   if (!player || index >= player.inventory.length) return;
@@ -2330,7 +2550,7 @@ function useItem(index) {
   // Determine if it is equippable and find its slot
   let slot = item.slot;
   if (!slot) {
-    if (item.type === "weapon" || item.type === "rare_weapon" || item.type === "super_rare_weapon" || item.type === "STAFF_BLUE" || item.type === "GREATSWORD_FROST") {
+    if (item.type === "weapon" || item.type === "rare_weapon" || item.type === "very_rare_weapon" || item.type === "epic_weapon" || item.type === "super_rare_weapon" || item.type === "mythic_weapon" || item.type === "STAFF_BLUE" || item.type === "GREATSWORD_FROST") {
       slot = "weapon";
     } else if (item.type.startsWith("eq_")) {
       slot = item.type.replace("eq_", "");
@@ -2504,8 +2724,8 @@ function spawnDroppedItem(item) {
   let radius = 9;
   if (item.type === "coin") {
     radius = 5;
-  } else if (item.slot === "weapon" || item.type === "weapon" || item.type === "rare_weapon" || item.type === "super_rare_weapon" || item.type === "STAFF_BLUE" || item.type === "GREATSWORD_FROST") {
-    radius = item.rarity === "legendary" ? 11 : 10;
+  } else if (item.slot === "weapon" || item.type === "weapon" || item.type === "rare_weapon" || item.type === "very_rare_weapon" || item.type === "epic_weapon" || item.type === "super_rare_weapon" || item.type === "mythic_weapon" || item.type === "STAFF_BLUE" || item.type === "GREATSWORD_FROST") {
+    radius = item.rarity === "mythic" ? 12 : (item.rarity === "legendary" ? 11 : 10);
   } else if (item.slot === "ring" || item.slot === "pendant" || item.type.startsWith("eq_ring") || item.type.startsWith("eq_pendant")) {
     radius = 8;
   } else if (item.type && item.type.includes("potion")) {
@@ -2549,6 +2769,53 @@ function dropItem(index) {
   saveGame();
 }
 window.dropItem = dropItem;
+
+function deleteItem(index) {
+  if (!player || index < 0 || index >= player.inventory.length) return;
+  let item = player.inventory[index];
+  
+  player.inventory.splice(index, 1);
+  addFloatingText("Eliminado: " + item.name, player.x, player.y - 20, "#e74c3c");
+  updateInventoryUI();
+  saveGame();
+}
+window.deleteItem = deleteItem;
+
+function selectBackpackItem(index) {
+  selectedBackpackIndex = index;
+  
+  // Update selected class in DOM
+  const slots = document.querySelectorAll("#backpack-grid .inv-slot");
+  slots.forEach((slot, idx) => {
+    if (idx === index) {
+      slot.classList.add("selected");
+    } else {
+      slot.classList.remove("selected");
+    }
+  });
+  
+  // Show / update the action bar
+  const actionsBar = document.getElementById("inv-actions-bar");
+  const actionsTitle = document.getElementById("inv-actions-title");
+  
+  if (actionsBar) {
+    if (index >= 0 && player && index < player.inventory.length) {
+      let item = player.inventory[index];
+      actionsBar.classList.remove("hidden");
+      if (actionsTitle) {
+        actionsTitle.innerText = `${item.name} (${item.rarity || 'Común'})`;
+        actionsTitle.style.color = item.color || "#f1c40f";
+      }
+    } else {
+      actionsBar.classList.add("hidden");
+      if (actionsTitle) {
+        actionsTitle.innerText = "Ningún objeto seleccionado";
+        actionsTitle.style.color = "#f1c40f";
+      }
+    }
+  }
+}
+window.selectBackpackItem = selectBackpackItem;
 
 function updatePowerBarUI() {
   let hudPowerBar = document.getElementById("power-bar");
@@ -2729,7 +2996,7 @@ function finishReward() {
   let parsedFloor = typeof floor === 'string' ? parseFloat(floor) : floor;
   maxFloor = Math.max(parsedMaxFloor, parsedFloor);
 
-  initLevel(player.name, player.charClass, player.gender, false);
+  initLevel(player.name, player.charClass, false);
   saveGame();
   setGameState("PLAYING");
   updateMobileControlsVisibility();
@@ -2957,7 +3224,7 @@ function handleInteraction() {
           floor = prevFloor;
         }
       }
-      initLevel(player.name, player.charClass, player.gender, false);
+      initLevel(player.name, player.charClass, false);
       saveGame();
       console.log(`¡Retrocediendo al Piso ${floor}!`);
       addFloatingText(`Piso ${floor}`, player.x, player.y - 20, "#9b59b6");
@@ -2978,7 +3245,7 @@ function advanceFloor() {
 
   if (parsedNextFloor <= parsedMaxFloor) {
     floor = nextFloor;
-    initLevel(player.name, player.charClass, player.gender, false);
+    initLevel(player.name, player.charClass, false);
     saveGame();
     addFloatingText(`Piso ${floor}`, player.x, player.y - 20, "#2ecc71");
     console.log(`¡Avanzando al Piso ${floor} (Bypass de Recompensa)!`);
@@ -2990,7 +3257,7 @@ function advanceFloor() {
     } else {
       floor = nextFloor;
       maxFloor = Math.max(parsedMaxFloor, parsedNextFloor);
-      initLevel(player.name, player.charClass, player.gender, false);
+      initLevel(player.name, player.charClass, false);
       saveGame();
       addFloatingText(`Piso ${floor}`, player.x, player.y - 20, "#2ecc71");
       console.log(`¡Avanzando al Piso ${floor}!`);
@@ -3049,7 +3316,9 @@ function updateShopUI() {
       div.className = "shop-item";
       
       let rarityClass = "rarity-common";
-      if (item.type === "rare_weapon") rarityClass = "rarity-rare";
+      if (item.rarity) {
+        rarityClass = "rarity-" + item.rarity;
+      } else if (item.type === "rare_weapon") rarityClass = "rarity-rare";
       else if (item.type === "super_rare_weapon") rarityClass = "rarity-legendary";
       
       div.innerHTML = `
@@ -3097,8 +3366,14 @@ function updateShopUI() {
           rarityClass = "rarity-" + item.rarity;
         } else if (item.type === "rare_weapon") {
           rarityClass = "rarity-rare";
+        } else if (item.type === "very_rare_weapon") {
+          rarityClass = "rarity-very_rare";
+        } else if (item.type === "epic_weapon") {
+          rarityClass = "rarity-epic";
         } else if (item.type === "super_rare_weapon") {
           rarityClass = "rarity-legendary";
+        } else if (item.type === "mythic_weapon") {
+          rarityClass = "rarity-mythic";
         }
         
         div.innerHTML = `
@@ -3211,28 +3486,7 @@ if (tabBuy && tabSell && buyPanel && sellPanel) {
   });
 }
 
-// Set up touch event for mobile interact button
-const btnInteract = document.getElementById("btn-interact");
-if (btnInteract) {
-  btnInteract.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    btnInteract.classList.add("pressed");
-    handleInteraction();
-  });
-  btnInteract.addEventListener("touchend", (e) => {
-    e.preventDefault();
-    btnInteract.classList.remove("pressed");
-  });
-  btnInteract.addEventListener("touchcancel", (e) => {
-    e.preventDefault();
-    btnInteract.classList.remove("pressed");
-  });
-  // Also add click event for hybrid/desktop touch emulation
-  btnInteract.addEventListener("click", (e) => {
-    e.preventDefault();
-    handleInteraction();
-  });
-}
+
 
 // Fullscreen mode helpers and orientation lock
 function enterFullscreen() {
@@ -3335,8 +3589,10 @@ function toggleCharacterPanel() {
   if (charToggleBtn) {
     if (hudEl.classList.contains("collapsed")) {
       charToggleBtn.classList.remove("active");
+      charToggleBtn.classList.remove("hidden"); // Muestra el botón flotante para restaurar el HUD
     } else {
       charToggleBtn.classList.add("active");
+      charToggleBtn.classList.add("hidden"); // Oculta el botón ya que el HUD está visible
     }
   }
 }
@@ -3379,44 +3635,40 @@ function updateSafeRoomNPCs(deltaTime) {
   }
 }
 
-function drawSafeRoomNPCs(ctx, camera) {
-  for (let npc of safeRoomNPCs) {
-    let rx = npc.x - camera.x;
-    let ry = npc.y - camera.y;
-    
-    // Draw NPC body/emoji
-    ctx.save();
-    ctx.fillStyle = "rgba(142, 68, 173, 0.4)"; // Translucent purple backing
-    ctx.fillRect(rx - npc.width / 2, ry - npc.height / 2, npc.width, npc.height);
-    
-    ctx.fillStyle = '#fff';
-    ctx.font = '28px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(npc.sprite, rx, ry);
-    ctx.restore();
-    
-    // Draw NPC Name Label underneath
-    ctx.save();
-    ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-    ctx.lineWidth = 1;
-    ctx.font = "bold 11px 'Courier New', Courier, monospace";
-    let nameW = ctx.measureText(npc.name).width;
-    ctx.fillRect(rx - nameW / 2 - 5, ry + npc.height / 2 + 2, nameW + 10, 16);
-    ctx.strokeRect(rx - nameW / 2 - 5, ry + npc.height / 2 + 2, nameW + 10, 16);
-    ctx.fillStyle = "#f1c40f"; // Gold text for names
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(npc.name, rx, ry + npc.height / 2 + 10);
-    ctx.restore();
-  }
+function drawSafeRoomNPC(ctx, camera, npc) {
+  let rx = npc.x - camera.x;
+  let ry = npc.y - camera.y;
+  
+  // Draw NPC body/emoji
+  ctx.save();
+  ctx.fillStyle = "rgba(142, 68, 173, 0.4)"; // Translucent purple backing
+  ctx.fillRect(rx - npc.width / 2, ry - npc.height / 2, npc.width, npc.height);
+  
+  ctx.fillStyle = '#fff';
+  ctx.font = '28px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(npc.sprite, rx, ry);
+  ctx.restore();
+  
+  // Draw NPC Name Label underneath
+  ctx.save();
+  ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+  ctx.lineWidth = 1;
+  ctx.font = "bold 11px 'Courier New', Courier, monospace";
+  let nameW = ctx.measureText(npc.name).width;
+  ctx.fillRect(rx - nameW / 2 - 5, ry + npc.height / 2 + 2, nameW + 10, 16);
+  ctx.strokeRect(rx - nameW / 2 - 5, ry + npc.height / 2 + 2, nameW + 10, 16);
+  ctx.fillStyle = "#f1c40f"; // Gold text for names
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(npc.name, rx, ry + npc.height / 2 + 10);
+  ctx.restore();
   
   // Draw dialogue bubble if active
-  if (activeDialogNPC) {
-    let npc = activeDialogNPC;
-    let rx = npc.x - camera.x;
-    let ry = npc.y - camera.y - npc.height / 2 - 25; // Above NPC
+  if (activeDialogNPC === npc) {
+    let ryBubble = npc.y - camera.y - npc.height / 2 - 25; // Above NPC
     
     ctx.save();
     ctx.font = "12px 'Courier New', Courier, monospace";
@@ -3433,29 +3685,35 @@ function drawSafeRoomNPCs(ctx, camera) {
     ctx.fillStyle = 'rgba(20, 15, 25, 0.9)'; // Dark warm background
     ctx.strokeStyle = '#f1c40f'; // Golden border
     ctx.lineWidth = 1.5;
-    ctx.fillRect(rx - boxW / 2, ry - boxH / 2, boxW, boxH);
-    ctx.strokeRect(rx - boxW / 2, ry - boxH / 2, boxW, boxH);
+    ctx.fillRect(rx - boxW / 2, ryBubble - boxH / 2, boxW, boxH);
+    ctx.strokeRect(rx - boxW / 2, ryBubble - boxH / 2, boxW, boxH);
     
     // Dialogue text
     ctx.fillStyle = '#fff';
-    ctx.fillText(npc.dialog, rx, ry);
+    ctx.fillText(npc.dialog, rx, ryBubble);
     
     // Draw small arrow pointing down from bubble
     ctx.fillStyle = 'rgba(20, 15, 25, 0.9)';
     ctx.beginPath();
-    ctx.moveTo(rx - 6, ry + boxH / 2);
-    ctx.lineTo(rx + 6, ry + boxH / 2);
-    ctx.lineTo(rx, ry + boxH / 2 + 6);
+    ctx.moveTo(rx - 6, ryBubble + boxH / 2);
+    ctx.lineTo(rx + 6, ryBubble + boxH / 2);
+    ctx.lineTo(rx, ryBubble + boxH / 2 + 6);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = '#f1c40f';
     ctx.beginPath();
-    ctx.moveTo(rx - 6, ry + boxH / 2);
-    ctx.lineTo(rx, ry + boxH / 2 + 6);
-    ctx.lineTo(rx + 6, ry + boxH / 2);
+    ctx.moveTo(rx - 6, ryBubble + boxH / 2);
+    ctx.lineTo(rx, ryBubble + boxH / 2 + 6);
+    ctx.lineTo(rx + 6, ryBubble + boxH / 2);
     ctx.stroke();
     
     ctx.restore();
+  }
+}
+
+function drawSafeRoomNPCs(ctx, camera) {
+  for (let npc of safeRoomNPCs) {
+    drawSafeRoomNPC(ctx, camera, npc);
   }
 }
 
@@ -3467,6 +3725,33 @@ function interactWithNPC(npc) {
   if (npc.id === "merchant") {
     openShopModal();
   }
+}
+
+function checkInteractableClick(clientX, clientY) {
+  if (gameState !== "PLAYING" || !player || !currentInteractable) return false;
+
+  // Convert click/touch coordinates to world coordinates
+  let clickX = clientX + camera.x;
+  let clickY = clientY + camera.y;
+
+  // 1. Check if clicked near the current interactable object itself
+  let dx = clickX - currentInteractable.x;
+  let dy = clickY - currentInteractable.y;
+  let distToObject = Math.sqrt(dx * dx + dy * dy);
+
+  // 2. Check if clicked near the player or the prompt above player's head
+  let clickedPrompt = (
+    clickX >= player.x - 60 && clickX <= player.x + 60 &&
+    clickY >= player.y - player.height - 40 && clickY <= player.y + 10
+  );
+
+  // If clicked within 40px of the object or in the player prompt area, trigger interaction
+  if (distToObject <= 40 || clickedPrompt) {
+    handleInteraction();
+    return true;
+  }
+
+  return false;
 }
 
 function checkNPCClick(clientX, clientY) {
@@ -3487,3 +3772,92 @@ function checkNPCClick(clientX, clientY) {
   }
   return false;
 }
+
+function checkItemClick(clientX, clientY) {
+  if (gameState !== "PLAYING" || !player) return false;
+  
+  // Convert screen coordinates to world coordinates
+  let clickX = clientX + camera.x;
+  let clickY = clientY + camera.y;
+
+  // Check items on the ground
+  for (let i = 0; i < droppedItems.length; i++) {
+    let it = droppedItems[i];
+    if (it.type === "gold_chest") continue; // Handled by chest interactable
+
+    // Item radius is usually 10-15px, we add a generous touch hitbox of 30px
+    let radius = it.radius || 15;
+    let hitRadius = Math.max(radius, 30); 
+
+    let dx = clickX - it.x;
+    let dy = clickY - it.y;
+    let clickDist = Math.sqrt(dx * dx + dy * dy);
+
+    if (clickDist <= hitRadius) {
+      // Check distance between player and item (limit 70px)
+      let pdx = player.x - it.x;
+      let pdy = player.y - it.y;
+      let playerDist = Math.sqrt(pdx * pdx + pdy * pdy);
+
+      if (playerDist <= 70) {
+        pickupItemDirectly(i);
+      } else {
+        addFloatingText("¡Muy lejos!", it.x, it.y - 10, "#e74c3c");
+      }
+      return true; // We interacted with the item
+    }
+  }
+  return false;
+}
+window.checkItemClick = checkItemClick;
+
+function pickupItemDirectly(index) {
+  if (index < 0 || index >= droppedItems.length) return;
+  let it = droppedItems[index];
+
+  if (it.type === "coin") {
+    player.coins = (player.coins || 0) + it.value;
+    addFloatingText("+" + it.value + " 🪙", it.x, it.y, "#f1c40f");
+    if (typeof playCoinSound === "function") {
+      playCoinSound();
+    }
+    droppedItems.splice(index, 1);
+    const hudCoins = document.getElementById("hud-coins");
+    if (hudCoins) hudCoins.innerText = player.coins;
+    console.log("Monedas de oro obtenidas: " + it.value + ". Total: " + player.coins);
+    saveGame();
+  } else if (it.type && it.type.startsWith("material_")) {
+    player.materials = player.materials || {};
+    player.materials[it.type] = (player.materials[it.type] || 0) + 1;
+    addFloatingText(it.name + " +1 📦", it.x, it.y, it.color || "#fff");
+    droppedItems.splice(index, 1);
+    updateInventoryUI();
+    saveGame();
+  } else {
+    // Pick up item if backpack is not full
+    if (player.inventory.length < 15) {
+      player.inventory.push({
+        type: it.type,
+        name: it.name,
+        rarity: it.rarity,
+        color: it.color,
+        bonus: it.bonus,
+        hpBonus: it.hpBonus,
+        healAmount: it.healAmount,
+        manaAmount: it.manaAmount,
+        slot: it.slot,
+        classRestriction: it.classRestriction,
+        icon: it.icon,
+        desc: it.desc,
+        stats: it.stats
+      });
+      addFloatingText(it.name, it.x, it.y, it.color || "#fff");
+      droppedItems.splice(index, 1);
+      updateInventoryUI();
+      saveGame();
+    } else {
+      addFloatingText("¡Mochila llena!", it.x, it.y - 10, "#e74c3c");
+    }
+  }
+}
+window.pickupItemDirectly = pickupItemDirectly;

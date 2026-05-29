@@ -127,12 +127,13 @@ class BossFloor15 extends Boss {
     }
 
     teleportNearPlayer(player, dungeon) {
+        let checkSolid = window.isSolidAt || ((x, y, w, h, ignore) => dungeon && dungeon.isWallRect(x, y, w, h));
         let angle = Math.random() * Math.PI * 2;
         let dist = 100 + Math.random() * 80;
         let tx = player.x + Math.cos(angle) * dist;
         let ty = player.y + Math.sin(angle) * dist;
         
-        if (!dungeon.isWallRect(tx, ty, this.width, this.height)) {
+        if (!checkSolid(tx, ty, this.width, this.height, this)) {
             // Leave a projectile at old position
             this.projectiles.push({
                 x: this.x,
@@ -209,6 +210,7 @@ class BossFloor15 extends Boss {
 
     summonMinions(dungeon) {
         if (typeof Enemy !== 'undefined' && typeof enemies !== 'undefined') {
+            let checkSolid = window.isSolidAt || ((x, y, w, h, ignore) => dungeon && dungeon.isWallRect(x, y, w, h));
             if (typeof addFloatingText !== 'undefined') {
                 addFloatingText("👾 INVOCAR SOMBRAS", this.x, this.y - 45, "#2c3e50");
             }
@@ -216,7 +218,7 @@ class BossFloor15 extends Boss {
             angles.forEach(ang => {
                 let sx = this.x + Math.cos(ang) * 60;
                 let sy = this.y + Math.sin(ang) * 60;
-                if (!dungeon.isWallRect(sx, sy, 20, 20)) {
+                if (!checkSolid(sx, sy, 20, 20)) {
                     let slime = new Enemy(sx, sy, this.floor, 'poison');
                     slime.color = '#34495e'; // Shadow colour
                     slime.name = "Sombra del Vacío";

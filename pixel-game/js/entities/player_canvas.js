@@ -45,7 +45,7 @@ const CHARACTER_CLASSES = {
 };
 
 class Player {
-    constructor(x, y, name, charClass, gender) {
+    constructor(x, y, name, charClass) {
         this.x = x;
         this.y = y;
         this.width = 24;
@@ -53,7 +53,6 @@ class Player {
         
         this.name = name;
         this.charClass = charClass;
-        this.gender = gender;
 
         // RPG experience and progression properties
         this.level = 1;
@@ -438,15 +437,17 @@ class Player {
         let newX = this.x + dx * currentSpeed;
         let newY = this.y + dy * currentSpeed;
 
-        // Collision with walls using Axis-Aligned Bounding Box
-        if (!dungeon.isWallRect(newX, newY, this.width, this.height)) {
+        let checkSolid = window.isSolidAt || ((x, y, w, h) => dungeon && dungeon.isWallRect(x, y, w, h));
+
+        // Collision with walls and solids using Axis-Aligned Bounding Box
+        if (!checkSolid(newX, newY, this.width, this.height, this)) {
             this.x = newX;
             this.y = newY;
         } else {
             // Try sliding (move only X or only Y)
-            if (!dungeon.isWallRect(newX, this.y, this.width, this.height)) {
+            if (!checkSolid(newX, this.y, this.width, this.height, this)) {
                 this.x = newX;
-            } else if (!dungeon.isWallRect(this.x, newY, this.width, this.height)) {
+            } else if (!checkSolid(this.x, newY, this.width, this.height, this)) {
                 this.y = newY;
             }
         }
@@ -586,10 +587,11 @@ class Player {
                 if (dungeon) {
                     let dashDistance = 80;
                     let step = 5;
+                    let checkSolid = window.isSolidAt || ((x, y, w, h) => dungeon && dungeon.isWallRect(x, y, w, h));
                     for (let d = 0; d < dashDistance; d += step) {
                         let testX = this.x + this.facing.x * step;
                         let testY = this.y + this.facing.y * step;
-                        if (!dungeon.isWallRect(testX, testY, this.width, this.height)) {
+                        if (!checkSolid(testX, testY, this.width, this.height, this)) {
                             this.x = testX;
                             this.y = testY;
                         } else {

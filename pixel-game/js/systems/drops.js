@@ -27,18 +27,15 @@ function rollMobDrop(floor, x, y, playerClass, killedEnemiesCount) {
     });
   }
 
-  // 2. Weapon drops based on precise rates
+  // 2. Weapon drops based on precise rates (Epic and Legendary removed from common mobs)
   let rand = Math.random();
-  if (rand < 0.00000001) { // 0.000001% for Legendary
-    let item = generateClassWeapon("legendary", floor, playerClass);
+  if (rand < 0.005) { // 0.5% for Very Rare (Poco Común)
+    let item = generateClassWeapon("very_rare", floor, playerClass);
     drops.push(createWeaponDropObj(item, x, y));
-  } else if (rand < 0.00000001 + 0.00001) { // 0.001% for Epic
-    let item = generateClassWeapon("epic", floor, playerClass);
-    drops.push(createWeaponDropObj(item, x, y));
-  } else if (rand < 0.00000001 + 0.00001 + 0.01) { // 1% for Rare
+  } else if (rand < 0.005 + 0.01) { // 1% for Rare
     let item = generateClassWeapon("rare", floor, playerClass);
     drops.push(createWeaponDropObj(item, x, y));
-  } else if (rand < 0.00000001 + 0.00001 + 0.01 + 0.05) { // 5% for Normal (Common)
+  } else if (rand < 0.005 + 0.01 + 0.05) { // 5% for Normal (Common)
     let item = generateClassWeapon("common", floor, playerClass);
     drops.push(createWeaponDropObj(item, x, y));
   }
@@ -200,7 +197,7 @@ function rollBossDrop(floor, x, y, playerClass) {
     value: coinsAmount,
   });
 
-  // 2. Special floor 15 Unique Boss weapons
+  // 2. Special floor 15 Unique Boss weapons (100% probability)
   if (floor === 15) {
     let specialBonus = 0.05 + Math.max(0, (floor - 15) * 0.01);
     if (playerClass === "mage") {
@@ -234,22 +231,66 @@ function rollBossDrop(floor, x, y, playerClass) {
     }
   }
 
-  // 3. Tira de 2 a 3 objetos garantizados de rareza superior (Mínimo Raro, con alta probabilidad de Épico o Legendario)
-  let count = Math.floor(Math.random() * 2) + 2; // 2 or 3 items
-  for (let i = 0; i < count; i++) {
-    let rarity = rollRarity(true);
+  // 3. Boss Equipment/Weapon roll (15% probability)
+  if (Math.random() < 0.15) {
+    let randRarity = Math.random();
+    let rarity = "epic";
+    if (randRarity < 0.05) {
+      rarity = "mythic";
+    } else if (randRarity < 0.25) {
+      rarity = "legendary";
+    }
+    
+    let pLevel = (player && player.level) ? player.level : floor;
     let ox = x + (Math.random() - 0.5) * 30;
     let oy = y + (Math.random() - 0.5) * 30;
 
-    let itemPool = ["weapon", "armor", "ring", "pendant"];
-    let typeSelected = itemPool[Math.floor(Math.random() * itemPool.length)];
-
-    if (typeSelected === "weapon") {
-      let item = generateClassWeapon(rarity, floor, playerClass);
+    if (floor === 10 || floor === 15) {
+      // JEFE PISO 10 y JEFE PISO 15: joyería o ropa épica/legendaria/mítica (Solo 1 pieza, balanceada al nivel del jugador)
+      let isJewelry = Math.random() < 0.50;
+      if (isJewelry) {
+        let slot = Math.random() < 0.50 ? "ring" : "pendant";
+        let item = generateRandomAccessory(slot, pLevel, rarity);
+        drops.push({
+          x: ox,
+          y: oy,
+          radius: rarity === "mythic" ? 10 : 8,
+          type: item.type,
+          slot: item.slot,
+          color: item.color,
+          name: item.name,
+          rarity: item.rarity,
+          icon: item.icon,
+          desc: item.desc,
+          stats: item.stats
+        });
+      } else {
+        // Clothing (armor)
+        let slots = ["head", "chest", "legs", "gloves"];
+        let slot = slots[Math.floor(Math.random() * slots.length)];
+        let item = generateRandomEquipment(pLevel, rarity, slot);
+        drops.push({
+          x: ox,
+          y: oy,
+          radius: rarity === "mythic" ? 11 : 9,
+          type: item.type,
+          slot: item.slot,
+          color: item.color,
+          name: item.name,
+          rarity: item.rarity,
+          bonus: item.bonus,
+          icon: item.icon,
+          desc: item.desc,
+          stats: item.stats
+        });
+      }
+    } else {
+      // Jefes normales (pisos como el 5): Solo armas épicas/legendarias/míticas adaptadas al nivel del jugador
+      let item = generateClassWeapon(rarity, pLevel, playerClass);
       drops.push({
         x: ox,
         y: oy,
-        radius: rarity === "legendary" ? 11 : 10,
+        radius: rarity === "mythic" ? 12 : (rarity === "legendary" ? 11 : 10),
         type: item.type,
         slot: item.slot,
         classRestriction: item.classRestriction,
@@ -257,37 +298,6 @@ function rollBossDrop(floor, x, y, playerClass) {
         name: item.name,
         rarity: item.rarity,
         bonus: item.bonus,
-        icon: item.icon,
-        desc: item.desc,
-        stats: item.stats
-      });
-    } else if (typeSelected === "armor") {
-      let item = generateRandomEquipment(floor, rarity);
-      drops.push({
-        x: ox,
-        y: oy,
-        radius: 9,
-        type: item.type,
-        slot: item.slot,
-        color: item.color,
-        name: item.name,
-        rarity: item.rarity,
-        bonus: item.bonus,
-        icon: item.icon,
-        desc: item.desc,
-        stats: item.stats
-      });
-    } else {
-      let item = generateRandomAccessory(typeSelected, floor, rarity);
-      drops.push({
-        x: ox,
-        y: oy,
-        radius: 8,
-        type: item.type,
-        slot: item.slot,
-        color: item.color,
-        name: item.name,
-        rarity: item.rarity,
         icon: item.icon,
         desc: item.desc,
         stats: item.stats

@@ -118,11 +118,12 @@ class Boss {
                 pushX = player.facing.x * 12;
                 pushY = player.facing.y * 12;
             }
+            let checkSolid = window.isSolidAt || ((x, y, w, h, ignore) => typeof dungeon !== 'undefined' && dungeon && dungeon.isWallRect(x, y, w, h));
             let steps = 4;
             for (let s = 0; s < steps; s++) {
                 let stepX = this.x + pushX / steps;
                 let stepY = this.y + pushY / steps;
-                if (typeof dungeon !== 'undefined' && !dungeon.isWallRect(stepX, stepY, this.width, this.height)) {
+                if (!checkSolid(stepX, stepY, this.width, this.height, this)) {
                     this.x = stepX;
                     this.y = stepY;
                 } else {
@@ -169,6 +170,7 @@ class Boss {
     }
 
     update(player, dungeon, deltaTime) {
+        let checkSolid = window.isSolidAt || ((x, y, w, h, ignore) => typeof dungeon !== 'undefined' && dungeon && dungeon.isWallRect(x, y, w, h));
         if (this.lastHitTimer > 0) {
             this.lastHitTimer--;
         }
@@ -269,8 +271,8 @@ class Boss {
                     let newX = this.x + (dx / dist) * currentSpeed;
                     let newY = this.y + (dy / dist) * currentSpeed;
                     
-                    if (!dungeon.isWallRect(newX, this.y, this.width, this.height)) this.x = newX;
-                    if (!dungeon.isWallRect(this.x, newY, this.width, this.height)) this.y = newY;
+                    if (!checkSolid(newX, this.y, this.width, this.height, this)) this.x = newX;
+                    if (!checkSolid(this.x, newY, this.width, this.height, this)) this.y = newY;
                 }
 
                 if (this.phase === 2) {
@@ -330,8 +332,8 @@ class Boss {
                     let dashSpeed = currentSpeed * (this.phase === 2 ? 3.2 : 2.5);
                     let newX = this.x + (dx / dist) * dashSpeed;
                     let newY = this.y + (dy / dist) * dashSpeed;
-                    if (!dungeon.isWallRect(newX, this.y, this.width, this.height)) this.x = newX;
-                    if (!dungeon.isWallRect(this.x, newY, this.width, this.height)) this.y = newY;
+                    if (!checkSolid(newX, this.y, this.width, this.height, this)) this.x = newX;
+                    if (!checkSolid(this.x, newY, this.width, this.height, this)) this.y = newY;
                 }
                 if (this.stateTimer <= 0) {
                     this.state = 'CHASE';
@@ -356,8 +358,8 @@ class Boss {
                     let newX = this.x + (dx / dist) * currentSpeed;
                     let newY = this.y + (dy / dist) * currentSpeed;
                     
-                    if (!dungeon.isWallRect(newX, this.y, this.width, this.height)) this.x = newX;
-                    if (!dungeon.isWallRect(this.x, newY, this.width, this.height)) this.y = newY;
+                    if (!checkSolid(newX, this.y, this.width, this.height, this)) this.x = newX;
+                    if (!checkSolid(this.x, newY, this.width, this.height, this)) this.y = newY;
                 }
 
                 let attackChance = this.phase === 2 ? 0.015 : 0.005;
@@ -400,8 +402,8 @@ class Boss {
                     let dashSpeed = currentSpeed * 2.5;
                     let newX = this.x + (dx / dist) * dashSpeed;
                     let newY = this.y + (dy / dist) * dashSpeed;
-                    if (!dungeon.isWallRect(newX, this.y, this.width, this.height)) this.x = newX;
-                    if (!dungeon.isWallRect(this.x, newY, this.width, this.height)) this.y = newY;
+                    if (!checkSolid(newX, this.y, this.width, this.height, this)) this.x = newX;
+                    if (!checkSolid(this.x, newY, this.width, this.height, this)) this.y = newY;
                 }
                 if (this.stateTimer <= 0) {
                     this.state = 'CHASE';

@@ -221,6 +221,7 @@ button:active {
     display: flex;
     justify-content: center;
     align-items: center;
+    pointer-events: auto; /* Bloquea clics al canvas */
 }
 
 #inventory-modal.hidden {
@@ -236,8 +237,40 @@ button:active {
     pointer-events: all; /* IMPORTANTE: Asegura que el contenido reciba clics */
 }
 
-#inv-drop-zone {
+.inv-drop-zones-container {
+    display: flex;
+    gap: 10px;
     margin-top: 10px;
+}
+
+#inv-drop-zone {
+    flex: 1;
+    border: 2px dashed #3498db;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    color: #3498db;
+    background: rgba(52, 152, 219, 0.05);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    touch-action: manipulation;
+}
+
+#inv-drop-zone.dragover {
+    background: rgba(52, 152, 219, 0.2);
+    border-color: #2980b9;
+    color: #2980b9;
+    transform: scale(1.02);
+}
+
+#inv-delete-zone {
+    flex: 1;
     border: 2px dashed #e74c3c;
     border-radius: 8px;
     padding: 12px;
@@ -251,14 +284,91 @@ button:active {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
+    touch-action: manipulation;
 }
 
-#inv-drop-zone.dragover {
+#inv-delete-zone.dragover {
     background: rgba(231, 76, 60, 0.2);
     border-color: #c0392b;
     color: #c0392b;
     transform: scale(1.02);
+}
+
+.inv-slot.selected {
+    border-color: #f1c40f !important;
+    box-shadow: 0 0 10px rgba(241, 196, 15, 0.6);
+    background: rgba(241, 196, 15, 0.15) !important;
+}
+
+#inv-actions-bar {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(44, 62, 80, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#inv-actions-title {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #f1c40f;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.inv-actions-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.inv-actions-buttons button {
+    flex: 1;
+    padding: 8px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    touch-action: manipulation;
+    font-family: inherit;
+    color: white;
+}
+
+#btn-action-use {
+    background: #2ecc71;
+}
+#btn-action-use:hover {
+    background: #27ae60;
+}
+#btn-action-use:active {
+    transform: scale(0.95);
+}
+
+#btn-action-drop {
+    background: #3498db;
+}
+#btn-action-drop:hover {
+    background: #2980b9;
+}
+#btn-action-drop:active {
+    transform: scale(0.95);
+}
+
+#btn-action-delete {
+    background: #e74c3c;
+}
+#btn-action-delete:hover {
+    background: #c0392b;
+}
+#btn-action-delete:active {
+    transform: scale(0.95);
 }
 
 .grid-container {
@@ -898,11 +1008,6 @@ button:active {
     right: 94px;
     background-color: rgba(211, 84, 0, 0.4); /* Tierra/Roca */
 }
-#btn-p4 {
-    bottom: 140px;
-    right: 5px;
-    background-color: rgba(142, 68, 173, 0.4); /* Púrpura */
-}
 
 #btn-attack {
     position: absolute;
@@ -1144,11 +1249,14 @@ html.menu-active, body.menu-active {
 
     #inventory-modal {
         padding: 10px;
+        pointer-events: auto; /* Bloquea clics al canvas */
     }
 
     .inventory-content {
         min-width: 90%;
         padding: 10px;
+        max-height: 95dvh;
+        overflow-y: auto;
     }
 
     .grid-container {
@@ -1199,19 +1307,9 @@ html.menu-active, body.menu-active {
         bottom: 75px;
         right: 75px;
     }
-    #btn-p4 {
-        bottom: 112px;
-        right: 0px;
-    }
-    #btn-interact {
-        bottom: 0px;
-        right: 78px;
-        width: 44px;
-        height: 44px;
-        font-size: 1.1rem;
-    }
+
     .shop-content {
-        max-height: 90vh;
+        max-height: 90dvh;
         width: 95%;
         padding: 15px;
     }
@@ -1226,7 +1324,7 @@ html.menu-active, body.menu-active {
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     background: rgba(0, 0, 0, 0.75);
     z-index: 9999;
     display: flex;
@@ -1234,6 +1332,7 @@ html.menu-active, body.menu-active {
     align-items: center;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    pointer-events: auto; /* Bloquea clics al canvas */
 }
 
 #shop-modal.hidden {
@@ -1249,7 +1348,7 @@ html.menu-active, body.menu-active {
     border: 3px solid #f1c40f;
     width: 90%;
     max-width: 550px;
-    max-height: 85vh;
+    max-height: 85dvh;
     display: flex;
     flex-direction: column;
     pointer-events: all;
@@ -1424,6 +1523,7 @@ html.menu-active, body.menu-active {
 .rarity-very_rare { color: #9b59b6; text-shadow: 0 0 5px rgba(155, 89, 182, 0.3); }
 .rarity-epic { color: #e67e22; text-shadow: 0 0 6px rgba(230, 126, 34, 0.3); }
 .rarity-legendary { color: #f1c40f; text-shadow: 0 0 8px rgba(241, 196, 15, 0.4); }
+.rarity-mythic { color: #ff5500; text-shadow: 0 0 10px rgba(255, 85, 0, 0.6), 0 0 20px rgba(255, 85, 0, 0.3); font-weight: bold; }
 
 
 .shop-list::-webkit-scrollbar {
@@ -1441,39 +1541,6 @@ html.menu-active, body.menu-active {
     background: rgba(255, 255, 255, 0.3);
 }
 
-/* Mobile Interact Button */
-#btn-interact {
-    position: absolute;
-    bottom: 0px;
-    right: 105px;
-    width: 52px;
-    height: 52px;
-    background: rgba(46, 204, 113, 0.3);
-    border: 2.5px solid rgba(255, 255, 255, 0.4);
-    color: white;
-    font-size: 1.5rem;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    z-index: 1002;
-    pointer-events: auto;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
-    transition: transform 0.1s, border-color 0.2s, background-color 0.2s;
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-}
-
-#btn-interact:active, #btn-interact.pressed {
-    transform: scale(0.85);
-    background-color: rgba(46, 204, 113, 0.75);
-    border-color: rgba(255, 255, 255, 0.8);
-}
-
-#btn-interact.hidden {
-    display: none !important;
-}
 
 /* Structured Equipment Styles */
 .equip-cat-title {
@@ -1549,6 +1616,11 @@ html.menu-active, body.menu-active {
     box-shadow: 0 0 18px rgba(241, 196, 15, 0.9) !important;
 }
 
+.eq-slot.equipped.rarity-mythic {
+    border: 2px solid #ff5500 !important;
+    box-shadow: 0 0 22px rgba(255, 85, 0, 1), inset 0 0 8px rgba(255, 85, 0, 0.5) !important;
+}
+
 /* Tooltip container styling */
 #item-tooltip {
     position: fixed;
@@ -1613,6 +1685,7 @@ html.menu-active, body.menu-active {
 .tooltip-rarity.rarity-very_rare { color: #9b59b6; text-shadow: 0 0 5px rgba(155, 89, 182, 0.3); }
 .tooltip-rarity.rarity-epic { color: #e67e22; text-shadow: 0 0 6px rgba(230, 126, 34, 0.3); }
 .tooltip-rarity.rarity-legendary { color: #f1c40f; text-shadow: 0 0 8px rgba(241, 196, 15, 0.4); }
+.tooltip-rarity.rarity-mythic { color: #ff5500; text-shadow: 0 0 10px rgba(255, 85, 0, 0.6), 0 0 20px rgba(255, 85, 0, 0.3); font-weight: bold; }
 
 /* Responsive adjustments for narrow portrait screens (mobile) */
 @media (max-width: 480px) {
@@ -1644,6 +1717,7 @@ html.menu-active, body.menu-active {
     
     .char-toggle-btn {
         left: 6px !important;
+        top: 6px !important;
         padding: 4px 10px !important;
         font-size: 0.72rem !important;
         background: rgba(18, 18, 18, 0.5) !important;
@@ -1654,8 +1728,7 @@ html.menu-active, body.menu-active {
 .char-toggle-btn {
     position: fixed;
     left: 15px;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 15px;
     z-index: 1005;
     background: rgba(18, 18, 18, 0.55);
     backdrop-filter: blur(8px);
@@ -1679,12 +1752,12 @@ html.menu-active, body.menu-active {
     background: rgba(231, 76, 60, 0.85);
     border-color: rgba(231, 76, 60, 0.4);
     color: #fff;
-    transform: translateY(-50%) scale(1.05);
+    transform: scale(1.05);
     box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
 }
 
 .char-toggle-btn:active {
-    transform: translateY(-50%) scale(0.95);
+    transform: scale(0.95);
 }
 
 .char-toggle-btn.active {
@@ -1700,6 +1773,11 @@ html.menu-active, body.menu-active {
 
 #game-canvas:focus {
     outline: none;
+}
+
+/* Prevent zoom and optimize tapping responsiveness */
+button, .inv-slot, .power-slot {
+    touch-action: manipulation;
 }
 
 

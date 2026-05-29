@@ -78,12 +78,13 @@ class Enemy {
                 pushY = player.facing.y * 40;
             }
             
-            // Move enemy in steps checking walls
+            // Move enemy in steps checking walls and solids
             let steps = 8;
+            let checkSolid = window.isSolidAt || ((x, y, w, h) => typeof dungeon !== 'undefined' && dungeon && dungeon.isWallRect(x, y, w, h));
             for (let s = 0; s < steps; s++) {
                 let stepX = this.x + pushX / steps;
                 let stepY = this.y + pushY / steps;
-                if (typeof dungeon !== 'undefined' && !dungeon.isWallRect(stepX, stepY, this.width, this.height)) {
+                if (!checkSolid(stepX, stepY, this.width, this.height, this)) {
                     this.x = stepX;
                     this.y = stepY;
                 } else {
@@ -177,14 +178,16 @@ class Enemy {
         let newX = this.x + this.dirX * currentSpeed;
         let newY = this.y + this.dirY * currentSpeed;
 
-        // Wall collision logic using Bounding Box
-        if (!dungeon.isWallRect(newX, this.y, this.width, this.height)) {
+        let checkSolid = window.isSolidAt || ((x, y, w, h) => dungeon && dungeon.isWallRect(x, y, w, h));
+
+        // Wall and solid collision logic using Bounding Box
+        if (!checkSolid(newX, this.y, this.width, this.height, this)) {
             this.x = newX;
         } else {
             this.dirX *= -1; // Bounce
         }
 
-        if (!dungeon.isWallRect(this.x, newY, this.width, this.height)) {
+        if (!checkSolid(this.x, newY, this.width, this.height, this)) {
             this.y = newY;
         } else {
             this.dirY *= -1; // Bounce

@@ -15,6 +15,8 @@ Para mantener el gameplay limpio, justo y libre de fugas de memoria, se establec
 5. **No hardcodear rutas de assets**: Utilizar rutas relativas consistentes y coherentes con la estructura del proyecto (ej: `./assets/...` en lugar de rutas absolutas locales).
 6. **Mantener compatibilidad con Netlify / PWA**: Asegurarse de que el Service Worker (`sw.js`) y `manifest.json` incluyan y apunten correctamente al archivo `index.html` (el juego principal de Canvas 2D) y que no se rompan las dependencias estáticas en el despliegue de Netlify.
 7. **Consumir el Registro de Clases**: Nunca codificar estadísticas de personajes de forma directa en condicionales (`if (charClass === 'warrior')`). Toda propiedad de clase (vida, mana, velocidad, avatares, equipamiento inicial, etc.) debe consultarse dinámicamente de `Player.CLASSES`.
+8. **Recogida Manual de Suelo**: No permitir recoger objetos del suelo de forma automática por proximidad física (excepto cuando se realiza un click/touch intencionado). El click/touch en un objeto debe cancelar cualquier ataque físico para evitar swings o uso de maná accidental.
+9. **Doble Mecánica en Inventario**: Todo slot debe admitir interacción táctil (primer toque selecciona y abre barra de acciones inferiores, segundo toque equipa/usa) y ratón/teclado de escritorio (Shift+Click para soltar al suelo, Ctrl+Click para eliminar permanentemente, drag-and-drop a sus zonas respectivas).
 
 ---
 
@@ -132,6 +134,123 @@ Para mantener el gameplay limpio, justo y libre de fugas de memoria, se establec
   - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
 - **Qué NO volver a hacer**: Operar daños directos sobre HP de jefes sin pasar por un canal regulado de armadura o getters/setters, ni omitir animaciones de drenado de daño visual en elementos clave del juego.
 
+### 10. Eliminación Completa de la Selección de Género
+- **Problema**: Presencia de parámetros, variables y propiedades redundantes relacionadas con el género (`gender`) del jugador en constructores, almacenamiento persistente y firmas de funciones, a pesar de haberse retirado visualmente de la pantalla inicial.
+- **Causa**: Código heredado de la primera fase que requería arrastrar el género a través del flujo de inicialización del nivel, inicio de partida y serialización de localStorage.
+- **Solución**: Se eliminó el argumento `gender` de la firma y llamadas de `startGame()`, `initLevel()`, del constructor de `Player` en `player_canvas.js`, de la propiedad `this.gender`, y de la persistencia de datos en `saveGame()`, garantizando la retrocompatibilidad al ignorar el campo al cargar partidas antiguas.
+- **Archivos Afectados**:
+  - [player_canvas.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/entities/player_canvas.js)
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+- **Qué NO volver a hacer**: Declarar variables, parámetros o persistir datos sobre características visuales o de rol obsoletas que ya no formen parte del juego base.
+
+### 11. Compatibilidad Multiplataforma Mobile y Corrección de Entrada Táctil
+- **Problema**: Varios problemas de interacción táctil y diseño visual impedían una experiencia fluida en iOS y Android:
+  1. Al hacer clic o tocar en el fondo oscuro de los modales (Mochila y Tienda), el evento traspasaba el contenedor y hacía que el jugador se moviese o atacase en segundo plano.
+  2. Los modales se cortaban verticalmente en pantallas de baja altura (típicas en orientación horizontal móvil) y no permitían scroll.
+  3. Los navegadores móviles sufrían retrasos de toque de 300ms y zooms accidentales debido a la falta de optimización de gestos en botones y slots.
+  4. Los cambios rápidos de orientación en Safari/iOS no actualizaban el lienzo del juego con los valores de ancho/alto correctos debido a un desfase de sincronía.
+  5. El botón flotante de "Personaje" (para alternar el HUD) se ubicaba en el centro-izquierdo de la pantalla, interfiriendo físicamente con la zona del joystick virtual móvil.
+- **Causa**: Configuración de `pointer-events` heredada de contenedores padres, uso de unidades fijas `vh` en lugar de `dvh` para viewports móviles, ausencia de directivas `touch-action` específicas y mala colocación espacial del HUD toggle.
+- **Solución**:
+  - Se añadió `pointer-events: auto;` a `#inventory-modal` y `#shop-modal` para interceptar toda entrada y evitar que se filtre al canvas de juego.
+  - Se optimizó `.inventory-content` con `max-height: 95dvh; overflow-y: auto;` y se actualizaron las propiedades del comerciante con `dvh` dinámicos.
+  - Se inyectó `touch-action: manipulation;` a todos los botones, ranuras del inventario (`.inv-slot`) y de habilidades (`.power-slot`) para eliminar el lag táctil y zooms rápidos del navegador.
+  - Se vinculó el evento `"orientationchange"` con un retardo de `200ms` a la función `resize()` para estabilizar la rotación en Safari.
+  - Se eliminó el botón virtual muerto `btn-p4` de los controles móviles y se reubicó `.char-toggle-btn` en la esquina superior izquierda (`top: 15px; left: 15px;` en desktop, `top: 6px; left: 6px;` en móvil), ocultándolo dinámicamente si el HUD está a la vista para limpiar la interfaz del joystick.
+- **Archivos Afectados**:
+  - [index.html](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/index.html)
+  - [style.css](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/style.css)
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+- **Qué NO volver a hacer**: Diseñar modales de pantalla completa sin bloquear explícitamente eventos de puntero (`pointer-events`), ignorar la relación de aspecto del landscape móvil al dimensionar contenedores de UI, o descuidar la proximidad física del joystick táctil al situar botones interactivos flotantes.
+
+### 12. Recogida Manual de Objetos y Prevención de Ataques
+- **Problema**: Recogida de objetos automática al pasar caminando por encima quitaba el control táctico del jugador, y clics accidentales de recogida provocaban ataques físicos/hechizos no deseados.
+- **Causa**: Colisiones por proximidad física calculadas en cada tick dentro del bucle principal de actualización. Clics en items no interceptados en los controladores globales del canvas de Phaser/Canvas2D.
+- **Solución**: Se eliminó la verificación de proximidad automática en `update()`. Se creó `checkItemClick()` y `pickupItemDirectly()` para permitir la recogida por click/toque dentro de un rango de 70px, mostrando "¡Muy lejos!" si es superior, y cancelando el ataque al interceptar el input.
+- **Archivos Afectados**:
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+- **Qué NO volver a hacer**: Ejecutar recolecciones de recursos sin validación expresa de acción o permitir que clics/toques de recolección en items se propaguen como ataques físicos.
+
+### 13. Sistema de Descarte e Interfaz Móvil Unificada
+- **Problema**: Dispositivos móviles no soportan arrastrar-y-soltar ni Shift+Clic/Ctrl+Clic para descartar u soltar items. Los descartes temporales podían reaparecer en el suelo.
+- **Causa**: Interfaz de mochila acoplada a gestos de ratón de escritorio y atajos de teclado sin vistas táctiles equivalentes.
+- **Solución**: Se dividió la zona inferior en dos áreas visuales (`#inv-drop-zone` y `#inv-delete-zone`). Se implementó una barra de acciones de objeto (`#inv-actions-bar`) que aparece al tocar un objeto, permitiendo usar/equipar, soltar o eliminar permanentemente el objeto seleccionado en pantallas táctiles.
+- **Archivos Afectados**:
+  - [index.html](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/index.html)
+  - [style.css](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/style.css)
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+- **Qué NO volver a hacer**: Depender únicamente de gestos drag-and-drop o combinaciones de teclas para mecánicas críticas de inventario en juegos híbridos móvil/web.
+
+### 14. Control Temporizado de Tooltips y Limpieza de DOM
+- **Problema**: Caja de información del objeto (`#item-tooltip`) quedaba stuck en pantalla al cerrarse el inventario, al usar/equipar un objeto, al morir o al cambiar de piso.
+- **Causa**: Pérdida de referencias en listeners `mouseleave` debido a la destrucción del slot del DOM que las contenía al actualizar el inventario.
+- **Solución**: Se inyectó un temporizador de auto-ocultación de 3 segundos (`tooltipTimeout = setTimeout`) en `showTooltip()`. Se incluyeron llamadas explícitas a `hideTooltip()` al regenerar slots, en `closeInventory()`, al cambiar de piso (`initLevel()`) y al morir el jugador (`gameOver()`).
+- **Archivos Afectados**:
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+- **Qué NO volver a hacer**: Dejar tooltips absolutos sin manejadores de tiempo autónomos o no forzar su limpieza inmediata ante redibujos de componentes dinámicos.
+
+### 15. Colisiones Físicas Reales, Separación de Entidades y Y-Sorting (Depth Sorting)
+- **Problema**: Los enemigos y el jugador se atravesaban mutuamente, quedaban apilados debajo de los avatares, y visualmente no existía un orden tridimensional correcto (Y-sorting), lo que rompía la inmersión al poder caminar a través de NPCs, cofres dorados u otros monstruos.
+- **Causa**: Las colisiones se validaban de forma individual únicamente contra paredes usando `dungeon.isWallRect`. No existía una capa de sólidos generalizada, y el dibujado de entidades se hacía en bucles fijos secuenciales independientes de la posición vertical.
+- **Solución**:
+  - Se implementó `window.isSolidAt(x, y, w, h, ignoreEntity)` que unifica las colisiones de muros, NPCs de safe room, merchants, cofres dorados, y el jugador/enemigos según corresponda.
+  - Se sustituyeron todas las llamadas a `dungeon.isWallRect` en el movimiento del jugador, slimes, y los diferentes jefes/minions por la comprobación unificada.
+  - Se reestructuró la función `draw()` en `game.js` para recolectar todas las entidades con volumen visual (jugador, enemigos, NPCs, cofres de oro), ordenarlas ascendentemente por su posición Y, y renderizarlas secuencialmente.
+- **Archivos Afectados**:
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+  - [player_canvas.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/entities/player_canvas.js)
+  - [enemy.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/entities/enemy.js)
+  - [boss.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/entities/boss.js)
+  - [Floor15Boss.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/entities/Floor15Boss.js)
+- **Qué NO volver a hacer**: Realizar comprobaciones directas contra `isWallRect` para el movimiento de entidades físicas o dibujar personajes/objetos sólidos en capas fijas desvinculadas de su coordenada Y.
+
+### 16. Interacciones por Toque Directo y Eliminación del Botón Flotante de Diálogo
+- **Problema**: El botón flotante de diálogo (`#btn-interact`) para dispositivos móviles se superponía con los cofres, escaleras de subida/bajada y el botón de ataque, causando clics accidentales y ensuciando la interfaz táctil.
+- **Causa**: Modelo antiguo de interacción que dependía de una tecla o de un botón flotante móvil único en pantalla para disparar la acción del interactivo más cercano.
+- **Solución**:
+  - Se eliminó el botón flotante `#btn-interact` del DOM (`index.html`) y sus estilos asociados en `style.css`.
+  - Se implementó `checkInteractableClick(clientX, clientY)` en `game.js`, el cual evalúa si un toque o clic del jugador se realiza sobre el objeto interactivo de rango (cofre, puerta, escalera, comerciante) dentro de un radio de 40px, o sobre la caja del prompt flotante de interacción dibujada arriba del personaje.
+  - Se integró la llamada en los manejadores globales `mousedown` y `touchstart` del canvas. Al pulsar sobre el interactivo o el prompt, se ejecuta la acción correspondiente (abrir cofre, cambiar piso, dialogar) y se detiene la propagación para evitar ataques accidentales o movimientos no deseados.
+- **Archivos Afectados**:
+  - [index.html](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/index.html)
+  - [style.css](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/style.css)
+- **Qué NO volver a hacer**: Utilizar botones flotantes de interacción específicos para móvil cuando se puede resolver mediante toques directos en el espacio del canvas sobre los objetos de juego o sobre sus prompts contextuales de interfaz.
+
+### 17. Zonas de Respawn Seguro y Balance del Sistema de Drops de Mobs y Bosses
+- **Problema**: El jugador reaparecía en áreas propensas a stunlocks/mobs y podía reencarnar encima de sólidos o enemigos. Adicionalmente, el balance de botines permitía que enemigos normales soltaran equipamiento de rareza Épica o Legendaria, y los jefes de piso no contaban con restricciones específicas ni adaptabilidad a nivel de jugador.
+- **Causa**: `initLevel` colocaba al jugador en las escaleras sin validar que la celda de spawn estuviera libre de obstáculos, y la invulnerabilidad al spawnear era nula. Los drops de slimes comunes en `drops.js` y `rarities.js` incluían rolls para armas y armaduras legendarias/épicas. Los jefes de piso generaban drops aleatorios generales de 2 a 3 piezas sin limitación de ranuras ni escalado por nivel.
+- **Solución**:
+  - **Respawn Seguro**: Se integró una validación en `initLevel` para reubicar al jugador en la baldosa libre más cercana de la sala de inicio si el punto de entrada es sólido. Se configuró `player.immunityTimer = 180` (3 segundos de invulnerabilidad) en spawn/respawn.
+  - **Distancia de Spawning de Enemigos**: Se aumentó la distancia mínima de generación entre mobs y jugador en `findSafeEnemySpawnPosition` de 3 a 6 celdas de mapa.
+  - **Balance de Drops**: Se reconfiguró `rollRarity` en `rarities.js` y `rollMobDrop` en `drops.js` para excluir la rareza Épica (epic) y Legendaria (legendary) en enemigos comunes, limitando sus drops a Común, Raro y Poco Común (very_rare).
+  - **Loot de Jefes**: Se reprogramó `rollBossDrop`. Los jefes normales (Piso 5) tienen un 15% de probabilidad total de soltar una única arma Épica o Legendaria adaptada al nivel del jugador (`player.level`). Los jefes de los pisos 10 y 15 tienen un 15% de probabilidad de soltar exactamente 1 pieza de joyería (anillo/colgante) o ropa (armadura) de rareza Épica o Legendaria, balanceada al nivel del jugador.
+- **Archivos Afectados**:
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+  - [loot.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/systems/loot.js)
+  - [rarities.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/systems/rarities.js)
+  - [drops.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/systems/drops.js)
+- **Qué NO volver a hacer**: Permitir que entidades comunes tengan acceso a rolls de tablas de botín de rareza superior (épicos/legendarios) o ignorar la validación física en los puntos iniciales de spawn y su respectivo retardo de invulnerabilidad.
+
+### 18. Rareza Mítica e Integración de Rarity Glows y Multi-Navegador
+- **Problema**: Necesidad de una nueva rareza premium (Mítica) superior a legendario, diferenciada con colores y efectos propios, junto con una revisión de compatibilidad multinavegador y optimización de inicialización de la interfaz.
+- **Causa**: Limitación en los tiers de equipamiento y redundancias de llamadas en la carga del script de la interfaz (`setupInventoryTabs` / `setupInventoryActionButtons`).
+- **Solución**:
+  - Se registró la rareza `mythic` con el color naranja neón (`#ff5500`) y etiqueta `"Mítica"`.
+  - Se configuró el multiplicador de daño a `3.5` (comparado con `2.7` de legendario) y se asignaron `6` estadísticas procedimentales.
+  - Se agregaron prefijos míticos específicos para armas: `"Segadora del Inframundo"` (Guerrero) y `"Báculo de la Singularidad"` (Mago), así como sufijos míticos para accesorios.
+  - Se implementó un resplandor de sombreado en canvas para botines tirados en el suelo míticos y legendarios, aumentando el grosor de línea a `3.5px` para míticos.
+  - Se agregaron las clases CSS de resplandor `.rarity-mythic`, `.tooltip-rarity.rarity-mythic` y el resplandor de slot `.eq-slot.equipped.rarity-mythic` con un `box-shadow` naranja neón.
+  - Se eliminaron las llamadas duplicadas de inicialización del inventario en la carga del script global para evitar dobles registros.
+- **Archivos Afectados**:
+  - [rarities.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/systems/rarities.js)
+  - [stats.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/systems/stats.js)
+  - [loot.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/systems/loot.js)
+  - [economy.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/systems/economy.js)
+  - [drops.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/systems/drops.js)
+  - [game.js](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/js/game.js)
+  - [style.css](file:///c:/Users/ARC/Downloads/freelance/proyecto%20de%20un%20juego%20en%20pc/pixel-game/style.css)
+- **Qué NO volver a hacer**: Inicializar componentes DOM o listeners de eventos múltiples veces fuera de los eventos hook de carga estándar (`DOMContentLoaded`).
+
 ---
 
 ## 🏗️ Convenciones y Arquitectura
@@ -169,6 +288,31 @@ El código del juego se organiza en directorios modulares claros:
 - **Multicapa de Barras de Salud**: Para jefes avanzados, se mapea la proporción de salud restante a un conjunto de 10 colores premium (de violeta a crimson). Se dibuja en pantalla-espacio el color actual, revelando debajo el color del segmento anterior y mostrando el conteo dinámico (ej: "x7") en la esquina superior del lienzo.
 - **Habilidades y Objetos Secundarios Autónomos**: Los portales, shockwaves de fuego y rayos del Archimago se gestionan mediante updates dinámicos que recalculan hitboxes y distancias con respecto al jugador, dibujando áreas de peligro y zonas seguras directamente integradas en el lienzo de juego.
 
+#### 4. Arquitectura de Interacción y Viewports en Dispositivos Móviles (Landscape)
+- **Bloqueo Táctil**: Modales absolutos deben contar con `pointer-events: auto` en sus contenedores principales para evitar fugas de eventos al canvas subyacente.
+- **HUD Toggle Inteligente**: El botón flotante `.char-toggle-btn` (Personaje) solo debe actuar como un control de contingencia (se muestra cuando el HUD está colapsado y se oculta cuando se despliega), reduciendo la sobrecarga cognitiva y eliminando obstrucciones espaciales cerca de las áreas de control (joystick).
+- **Dimensionamiento Elástico (dvh)**: Se prioriza el uso de la unidad de viewport dinámico (`dvh`) para contenedores modales, previniendo que los toolbars del navegador corten la visibilidad de los controles y permitiendo desbordes y scrolls verticales controlados (`overflow-y: auto`).
+
+#### 5. Arquitectura de Colisiones Físicas Unificadas y Y-Sorting (Depth Sorting)
+- **Renderizado Ordenado Dinámico (Y-Sorting)**: Los elementos planos del fondo (baldosas de suelo, pociones y monedas tiradas) se pintan primero. Luego, los avatares móviles (jugador, enemigos), los NPCs interactivos y los cofres de madera dorados se apilan en una lista única de renderizado que se ordena por su coordenada Y en cada frame. Esto garantiza que las entidades situadas abajo tapen a las de arriba, simulando una proyección tridimensional correcta.
+
+#### 6. Arquitectura de Interacción por Toque Directo Multiplataforma
+- **Detección Táctil de Rangos**: Cuando un objeto interactivo (cofre, puerta de jefe, escalera de subida/bajada, NPC o comerciante) entra en el rango de interacción del jugador, se establece la variable `currentInteractable`.
+- **Toque en Objeto / Prompt**: En lugar de un botón en pantalla, el motor intercepta toques y clics en el canvas mediante `checkInteractableClick`. Si las coordenadas del clic están cerca de la posición del interactivo (rango de 40px) o sobre el avatar/prompt del jugador (rango de 60px alrededor del prompt flotante), se llama a `handleInteraction()`.
+- **Prevención de Acción Secundaria**: El evento interceptado anula el ataque del jugador (`mouse.clicked = false`) y cancela la propagación del evento táctil (`e.preventDefault()`), garantizando una interacción limpia sin interrumpir el ritmo del combate ni gastar maná accidentalmente.
+
+#### 7. Arquitectura de Respawn Protegido y Loot Tables Estrictas
+- **Spawn Físico Validado**: El entrypoint `initLevel` calcula la baldosa de destino y valida mediante `isSolidAt` que no choca con ningún obstáculo (NPC, muro, etc.). En caso de colisión, un solucionador iterativo busca la primera baldosa transitable dentro de la sala de inicio.
+- **Invulnerabilidad por Cooldown**: Tras el spawn, se inicializa `player.immunityTimer = 180`, inhibiendo daños de enemigos y la aplicación de estados alterados (veneno, aturdimiento) durante los primeros 3 segundos.
+- **Loot Tables Segregadas**: Las tablas de botines de enemigos normales están tapadas en la rareza `very_rare` (Poco Común). Las rarezas `epic` y `legendary` se reservan en un 100% para drops de Bosses bajo un roll probabilístico unificado del 15%.
+- **Generación de Equipo Adaptativa**: Los métodos de generación (`generateClassWeapon`, `generateRandomEquipment` y `generateRandomAccessory`) escalan sus bonos y sufijos consultando dinámicamente `player.level` en lugar del piso actual en los botines de jefes, garantizando equipo proporcional al progreso real del jugador.
+
+#### 8. Arquitectura de Rareza Mítica y Efectos de Glow en Canvas/CSS
+- **Tier Mítico Registrado**: Se incorpora el nuevo tier `"mythic"` de rareza superior con multiplicador de potencia base de `3.5` y soporte para `6` estadísticas procedimentales secundarias.
+- **Resplandores del Sombreado en Canvas**: El trazado de botines en el suelo utiliza un contorno de trazo de color naranja brillante (`#ff5500`) con grosor aumentado a `3.5px` y un efecto de sombra difuminada en el lienzo para destacar visualmente en el piso.
+- **Estilos Glow CSS**: Se implementa un resplandor dinámico en los slots del inventario y tooltips para items míticos usando reglas `box-shadow` y `text-shadow` de alta fidelidad.
+- **Integración de Drop en Bosses**: Los bosses tienen un 15% de probabilidad total de soltar equipamiento; dentro de ese rol, existe una distribución del 5% Mítico, 20% Legendario y 75% Épico.
+
 ---
 
 ## 🗺️ Roadmap de Desarrollo / Próximos Pasos
@@ -188,3 +332,13 @@ El código del juego se organiza en directorios modulares claros:
 ### Fase 4: Optimización PWA, Guardado en Nube y Sonido
 * **Objetivo**: Mejorar la experiencia nativa de app móvil y offline.
 * **Mecánica**: Optimizar el Service Worker (`sw.js`) para cachear dinámicamente assets gráficos, habilitar slots de guardado en la nube/Firebase opcionales, y añadir efectos de sonido de sintetizador retro usando `Web Audio API`.
+* **Estado**: Escalado de viewports dinámicos, estabilidad ante rotación de pantalla, controles touch reubicados y prevención de zoom accidental [COMPLETADO].
+
+### Fase 5: Estabilización de Colisiones Físicas, Renderizado Y-Sorted, Zonas de Respawn Seguro y Balance de Loot
+* **Objetivo**: Garantizar colisiones reales con deslizamiento suave (sliding) entre el jugador, enemigos, NPCs y cofres, corregir solapamientos mediante profundidad visual (Y-sorted), limpiar la UI móvil reemplazando el botón flotante de diálogo por interacciones táctiles directas, asegurar zonas seguras de respawn libre de enemigos con protección de invulnerabilidad, y equilibrar de forma estricta las tablas de botín para enemigos comunes y bosses adaptadas al nivel de jugador.
+* **Estado**: Implementación de `isSolidAt` y Y-Sorting [COMPLETADO], Toque directo en interactivos [COMPLETADO], Spawn seguro con invulnerabilidad de 3s [COMPLETADO], y Loot Tables equilibradas con progresión adaptativa al nivel de jugador [COMPLETADO].
+
+### Fase 6: Implementación de Rareza Mítica, Compatibilidad Multi-Navegador y Optimización General
+* **Objetivo**: Diseñar y registrar la rareza Mítica, habilitar efectos estéticos de resplandor (glow) en Canvas y CSS, balancear la tabla de drop de bosses (5% Mítico, 20% Legendario, 75% Épico), comprobar compatibilidad y escalado en Google Chrome, Mozilla Firefox, Microsoft Edge, Opera y Safari, y limpiar listeners/llamadas redundantes de inicialización de la interfaz.
+* **Estado**: Registro de rareza mítica y stats de nivel 6 [COMPLETADO], Renderizado y bordes de resplandor en inventario y suelo [COMPLETADO], Balance de drops de bosses [COMPLETADO], y eliminación de duplicados en carga de scripts de la UI [COMPLETADO].
+
